@@ -8,7 +8,7 @@ The experience is split into **two Roblox places**:
 
 | Role | Place | Id |
 |---|---|---|
-| Lobby (start place) | The Last Tide | `91870148721134` |
+| Lobby (start place) | The Last Tide Lobby | `91870148721134` |
 | Game | The Last Tide Game | `100885379547959` |
 
 Players arrive in the **lobby**. Between-run activity lives there: the Shipyard, the permanent fleet,

@@ -5,7 +5,7 @@ The Last Tide is **two Roblox places** in one experience. See decision
 
 | Role | Place name | Place id | Sync root | Rojo project |
 |---|---|---|---|---|
-| Lobby (start place) | The Last Tide | `91870148721134` | `studio_lobby/` | `lobby.project.json` |
+| Lobby (start place) | The Last Tide Lobby | `91870148721134` | `studio_lobby/` | `lobby.project.json` |
 | Game | The Last Tide Game | `100885379547959` | `studio_game/` | `game.project.json` |
 
 Players always arrive in the lobby. An expedition is played in the game place.

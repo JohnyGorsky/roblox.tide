@@ -31,8 +31,6 @@ local shared = {
 }
 
 local gameRows = {
-	{ "Players.MaxPlayers", Players, "MaxPlayers", 6 },
-	{ "Players.PreferredPlayers", Players, "PreferredPlayers", 6 },
 	{ "Players.CharacterAutoLoads", Players, "CharacterAutoLoads", false },
 	{ "Players.RespawnTime", Players, "RespawnTime", 5 },
 	{ "Workspace.StreamingEnabled", workspace, "StreamingEnabled", true },
@@ -49,8 +47,6 @@ local gameRows = {
 }
 
 local lobbyRows = {
-	{ "Players.MaxPlayers", Players, "MaxPlayers", 20 },
-	{ "Players.PreferredPlayers", Players, "PreferredPlayers", 20 },
 	{ "Players.CharacterAutoLoads", Players, "CharacterAutoLoads", true },
 	{ "Players.RespawnTime", Players, "RespawnTime", 3 },
 	{ "Workspace.StreamingEnabled", workspace, "StreamingEnabled", false },
@@ -59,13 +55,19 @@ local lobbyRows = {
 }
 
 -- Human-only rows: NotScriptable place properties, and experience-level Creator Hub settings.
+-- Players.MaxPlayers / PreferredPlayers are deliberately NOT asserted above.
+-- Studio reports 60 regardless of the configured value — verified 2026-08-19 by reading them in a
+-- fresh Edit session after a reopen AND in a Play Server context; all three read 60. Studio's local
+-- playtest server does not allocate from the cloud experience config, so this value is simply not
+-- observable from here. Asserting it produced a permanent DRIFT row, which trains people to ignore
+-- the audit. Verify crew size in File > Experience Settings, or on a live published server.
 local humanTodo = {
 	"Lighting.LightingStyle         -> Realistic (user decision 2026-08-19; Properties panel, not scriptable)",
 	"   Realistic is the mobile-expensive path - measure on the device emulator before shipping.",
 	"Workspace.PhysicsSteppingMethod -> verify only, owned by feature 0001",
-	"Players.MaxPlayers / PreferredPlayers -> File > Experience Settings (READ ONLY to scripts, incl. plugin context).",
-	"   NOTE: an already-open place keeps reporting the value it loaded with, so this row can read",
-	"   DRIFT even after you set it correctly. Reopen the place before trusting it.",
+	"Players.MaxPlayers -> 6 game / 20 lobby, in File > Experience Settings.",
+	"   NOT CHECKABLE from Studio: Edit and Play both report 60 whatever you set. Confirm in the",
+	"   dialog or on a live server; this audit deliberately does not assert it.",
 	"Playable devices               -> Phone, Tablet, Computer (Creator Hub)",
 	"Avatar type                    -> R15 only (Creator Hub)",
 	"Genre Adventure, private, no monetization yet (Creator Hub)",
@@ -97,7 +99,7 @@ local placeName, rows
 if placeId == GAME_ID then
 	placeName, rows = "GAME (The Last Tide Game)", gameRows
 elseif placeId == LOBBY_ID then
-	placeName, rows = "LOBBY (The Last Tide)", lobbyRows
+	placeName, rows = "LOBBY (The Last Tide Lobby)", lobbyRows
 else
 	return ("UNKNOWN PLACE: placeId=%d is neither the lobby (%d) nor the game place (%d). "):format(placeId, LOBBY_ID, GAME_ID)
 		.. "If a place was recreated, update the ids in this script and in settings-baseline.md."

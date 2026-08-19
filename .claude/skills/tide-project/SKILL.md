@@ -50,7 +50,7 @@ The experience is **two Roblox places**. Confirm which one owns a file **before*
 
 | Role | Place | Id | Sync root | Rojo project |
 |---|---|---|---|---|
-| Lobby (start place) | The Last Tide | `91870148721134` | `studio_lobby/` | `lobby.project.json` |
+| Lobby (start place) | The Last Tide Lobby | `91870148721134` | `studio_lobby/` | `lobby.project.json` |
 | Game | The Last Tide Game | `100885379547959` | `studio_game/` | `game.project.json` |
 
 Lobby = between runs (Shipyard, fleet, parts inventory, loadout, crew roster, party forming).

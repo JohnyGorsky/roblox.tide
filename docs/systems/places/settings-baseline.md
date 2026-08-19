@@ -5,7 +5,7 @@ that only exists as a click in Studio is invisible and will drift. This file is 
 truth; [tools/audit-place-settings.luau](../../../tools/audit-place-settings.luau) re-reads the live
 places and reports anything that no longer matches.
 
-Places: lobby = The Last Tide `91870148721134`, game = The Last Tide Game `100885379547959`.
+Places: lobby = The Last Tide Lobby `91870148721134`, game = The Last Tide Game `100885379547959`.
 See [README.md](README.md) for what each place is for.
 
 Agreed in tide job 004. Rows marked **prov.** are provisional starting values owned by a later
@@ -71,8 +71,8 @@ capability. They are Properties-panel or Experience-Settings values, so they nee
 
 | Setting | Recommended | Why |
 |---|---|---|
-| `Players.MaxPlayers` | **6** game / **20** lobby | Read-only to scripts, so `File → Experience Settings` only. ⚠️ **An already-open place keeps reading the old value** — `Players.MaxPlayers` is the place config as the session loaded it, so the audit shows DRIFT until the place is reopened. Confirm in Experience Settings, not in the audit |
-| `Players.PreferredPlayers` | **6** game / **20** lobby | Same |
+| `Players.MaxPlayers` | **6** game / **20** lobby | Read-only to scripts, so `File → Experience Settings` only. ⚠️ **Not observable from Studio at all** — Edit *and* Play both report `60` whatever you set (verified after a reopen and in a Play Server context). The audit deliberately does not assert it; confirm in the dialog or on a live server |
+| `Players.PreferredPlayers` | **6** game / **20** lobby | Same — set in the dialog, not checkable from Studio |
 | `Lighting.LightingStyle` | **Realistic** — set by the user 2026-08-19, both places | `Lighting.Technology` **does not exist** in current Studio; `LightingStyle` replaced it. `Realistic` is the high-quality path, which suits the night/storm look. It is also the expensive one on phones — my recommendation had been `Soft`, and this is a deliberate override. **Its mobile cost is unmeasured**: measure on the device emulator before shipping (todo 0003) |
 | `Lighting.PrioritizeLightingQuality` | `true` (default, unchanged) | Trades shadow range against view distance under load. On open water, view distance may matter more than shadow detail — untested; revisit alongside the `Realistic` measurement |
 | `Workspace.PhysicsSteppingMethod` | verify, don't change yet | Owned by feature 0001 (boat controller). Note what it currently reads before touching it |
@@ -86,10 +86,12 @@ and `File → Avatar Settings`. Verified against live Studio 2026-08-19.
 
 | What | Where exactly |
 |---|---|
-| `MaxPlayers` / `PreferredPlayers` | `File → **Experience Settings**` — per place |
+| Max players ("**Maximum Visitor Count**") | **Creator Hub** → Creations → The Last Tide → Places → *place* → **Access** → Basic Settings. ✅ verified 6 / 20 on 2026-08-19. (Studio's Experience Settings dialog may also expose it — unverified) |
 | Avatar type (R15) | `File → **Avatar Settings**` — its own File-menu entry, *not* inside Experience Settings |
 | API services | Experience Settings → Security (already enabled) |
 | Playable devices | Creator Hub → experience → Settings |
+| **Direct Access Control** | Creator Hub → Places → *place* → **Access**. Game place should be **Secure within Universe only** (currently *Fully Open* — finding 0004). Lobby stays Fully Open |
+| **Social Slots** | Same page. Game place → **Disable**; lobby → Roblox optimized (finding 0005) |
 | `LightingStyle` / `PrioritizeLightingQuality` | **not** a dialog — Explorer → select `Lighting` → Properties. Per place, so do both |
 
 Web equivalent: [create.roblox.com](https://create.roblox.com/dashboard/creations) → experience →
@@ -120,7 +122,11 @@ Teleporting between places inside one experience needs no setting; "third-party 
    -> OK / DRIFT / HUMAN-TODO per row
 ```
 
-Current audit result: **everything in section 1 reads OK**; the only DRIFT rows are
-`MaxPlayers`/`PreferredPlayers`, which stay drifted until step 3 is done.
+Current audit result (2026-08-19, after both places were reopened): **everything in section 1 reads
+OK** — 21 rows in the game place, 13 in the lobby. The settings survived a full reopen, so they are
+genuinely saved into the `.rbxl`, not just live in an unsaved session.
+
+`CharacterAutoLoads = false` was additionally confirmed **live in a Play session**: the player joined
+the game place and their `Character` was `nil`, so nothing respawns unless the run says so.
 
 Re-run the audit after anyone edits place settings, and after any Studio version bump.
