@@ -14,6 +14,7 @@
 
 ## Systems
 
+- [Places (lobby + game)](systems/places/README.md)
 - [Vessels](systems/vessels/README.md)
 - [Boat baseline](systems/boat/README.md)
 - [Boat physics](systems/boat/physics.md)

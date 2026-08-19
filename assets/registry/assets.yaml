@@ -1,9 +1,21 @@
+# Asset registry for The Last Tide.
+#
+# `place` says which Roblox place the asset must exist in (see docs/systems/places/README.md):
+#   game        The Last Tide Game (100885379547959) - expedition content
+#   lobby       The Last Tide (91870148721134) - between-run content
+#   game, lobby needed in both; the lobby copy is normally a Shipyard/roster display
+#               version, so it may be a lower-detail or non-functional variant
+#
+# `roblox_path` is the path WITHIN that place. Bare service paths are ambiguous without `place`.
+
 assets:
 - id: ASSET-BOAT-STARTER
   type: model
   status: IDEA
   source: meshy
   roblox_path: ServerStorage.Assets.Boats.StarterBoat
+  place: game, lobby
+  place_notes: Playable in game; displayed in the lobby Shipyard as the starting vessel.
   feature: GAME-0001
   notes: Battered motor launch / ex-military utility boat.
 - id: ASSET-RADAR-MK1
@@ -11,6 +23,8 @@ assets:
   status: IDEA
   source: meshy
   roblox_path: ServerStorage.Assets.BoatModules.RadarMk1
+  place: game, lobby
+  place_notes: Functional in game; lobby needs it to preview permanent radar upgrades.
   feature: GAME-0002
   notes: Keep rotating antenna as a separate movable part.
 - id: ASSET-SHARK-01
@@ -18,6 +32,7 @@ assets:
   status: IDEA
   source: meshy
   roblox_path: ServerStorage.Assets.Enemies.Shark
+  place: game
   feature: GAME-0006
   notes: Needs swim, bite, ram, hit and death animations.
 - id: ASSET-ISLAND-LIGHTHOUSE
@@ -25,6 +40,7 @@ assets:
   status: IDEA
   source: mixed
   roblox_path: ServerStorage.Assets.Islands.Lighthouse
+  place: game
   feature: GAME-0005
   notes: Curated terrain + props + gameplay markers.
 - id: ASSET-PATROL-BOAT-01
@@ -32,6 +48,8 @@ assets:
   status: IDEA
   source: meshy
   roblox_path: ServerStorage.Assets.Vessels.PatrolBoat01
+  place: game, lobby
+  place_notes: Shown in the lobby as a Shipyard construction project before it is owned.
   feature: GAME-0008
   notes: Future larger vessel; keep bridge/radar/hardpoints and possible interior
     sections modular.
@@ -40,5 +58,7 @@ assets:
   status: IDEA
   source: meshy
   roblox_path: ServerStorage.Assets.Crew.Engineer01
+  place: game, lobby
+  place_notes: Performs tasks in game; shown in the lobby crew roster.
   feature: GAME-0009
   notes: Needs repair, carry, idle, walk/run and interaction animations.

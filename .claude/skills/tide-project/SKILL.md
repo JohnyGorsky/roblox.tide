@@ -44,6 +44,25 @@ Therefore:
 - **Never silently overturn an accepted decision** in [docs/decisions/](../../../docs/decisions/INDEX.md).
   If a decision needs to change, add a new decision record saying so.
 
+## Two places — check which one you are in
+
+The experience is **two Roblox places**. Confirm which one owns a file **before** editing it:
+
+| Role | Place | Id | Sync root | Rojo project |
+|---|---|---|---|---|
+| Lobby (start place) | The Last Tide | `91870148721134` | `studio_lobby/` | `lobby.project.json` |
+| Game | The Last Tide Game | `100885379547959` | `studio_game/` | `game.project.json` |
+
+Lobby = between runs (Shipyard, fleet, parts inventory, loadout, crew roster, party forming).
+Game = one expedition (vessel, ocean, storm, islands, enemies, in-run upgrades).
+
+`studio_lobby/` and `studio_game/` are separate worlds that share a repo. Both places are named in
+their paths on purpose so no path is ambiguous about its owner. Permanent progression crosses the
+boundary as account data through DataStores; in-run power does not cross back.
+
+Detail: [docs/systems/places/README.md](../../../docs/systems/places/README.md) ·
+why: [decision 0013](../../../docs/decisions/0013-two-places-lobby-and-game.md).
+
 ## Where to read (start here)
 
 1. [docs/INDEX.md](../../../docs/INDEX.md) — the map of everything below.
@@ -58,9 +77,10 @@ Therefore:
 |---|---|
 | Vision, core loop, pillars, progression, monetization, naming | `docs/game/` |
 | Visual/UI direction (palette, typography, HUD rules) | [visual-design.md](../../../docs/game/visual-design.md), [gui.md](../../../docs/game/gui.md), [fonts.md](../../../docs/game/fonts.md) |
-| Intended behavior of each system (16 of them) | `docs/systems/` |
-| Why an important choice was made (12 accepted) | `docs/decisions/` |
+| Intended behavior of each system (17 of them) | `docs/systems/` |
+| Why an important choice was made (13 accepted) | `docs/decisions/` |
 | Compact catalogs — enemies, weapons, vessels, islands, loot, events, encounters, upgrades, parts, crew | `docs/content/` |
+| The two places and what lives in each | [systems/places/README.md](../../../docs/systems/places/README.md) |
 | Sequencing and release scope | `docs/roadmap/` (start with [poc.md](../../../docs/roadmap/poc.md)) |
 | Asset status | [assets/registry/assets.yaml](../../../assets/registry/assets.yaml) |
 | The game's own full instruction text | [CLAUDE.md](../../../CLAUDE.md) (does **not** auto-load — see below) |
@@ -93,8 +113,10 @@ roblox.tide/
   README.md            design pack overview
   docs/                design memory: game/ systems/ decisions/ content/ features/ roadmap/
   assets/              registry/assets.yaml, meshy/ records + template, references/palette/
-  studio/              Rojo sync root — Roblox service folders (game code lives here)
-  default.project.json Rojo mapping: DataModel -> studio/<Service>
+  studio_lobby/        sync root for the LOBBY place (The Last Tide, 91870148721134)
+  studio_game/         sync root for the GAME place (The Last Tide Game, 100885379547959)
+  lobby.project.json   Rojo mapping: DataModel -> studio_lobby/<Service>
+  game.project.json    Rojo mapping: DataModel -> studio_game/<Service>
   .jobconfig.json      synced vs manual-copy paths, for job.py final summaries
   Jobs/                worked jobs (workspace lifecycle)
   Planned/             one file per queued idea
