@@ -1,16 +1,25 @@
 {
-  "_comment": "The Last Tide syncs all scripts under a top-level `studio/` folder on disk (Jungle uses `sync/`; Defender mirrors services at the repo root). Used by ../roblox.workspace/tools/job.py for the final-summary sync table; order matters (synced_paths win over non_synced_paths). PROVISIONAL: no Roblox place exists yet - confirm these against the live Studio Explorer's sync arrows once the place is created and Studio Sync is connected.",
+  "_comment": "The Last Tide has TWO places, each with its own sync root and Rojo project: studio_lobby/ = 'The Last Tide' (91870148721134, start place, lobby.project.json) and studio_game/ = 'The Last Tide Game' (100885379547959, game.project.json). Both places are named in their paths on purpose - neither is an unnamed default - so the owning place is unmistakable from any file path. Jungle uses sync/ vs lobby/sync/; Defender mirrors services at the repo root. Used by ../roblox.workspace/tools/job.py for the final-summary sync table; order matters (synced_paths win over non_synced_paths). PROVISIONAL: both places are still empty, so these paths follow convention rather than observed sync arrows - confirm against the live Studio Explorer once Studio Sync is connected (todo 0000).",
   "synced_paths": [
-    "studio/ReplicatedFirst/",
-    "studio/ReplicatedStorage/",
-    "studio/ServerScriptService/",
-    "studio/ServerStorage/",
-    "studio/StarterPlayer/StarterCharacterScripts/",
-    "studio/StarterPlayer/StarterPlayerScripts/"
+    "studio_lobby/ReplicatedFirst/",
+    "studio_lobby/ReplicatedStorage/",
+    "studio_lobby/ServerScriptService/",
+    "studio_lobby/ServerStorage/",
+    "studio_lobby/StarterPlayer/StarterCharacterScripts/",
+    "studio_lobby/StarterPlayer/StarterPlayerScripts/",
+    "studio_game/ReplicatedFirst/",
+    "studio_game/ReplicatedStorage/",
+    "studio_game/ServerScriptService/",
+    "studio_game/ServerStorage/",
+    "studio_game/StarterPlayer/StarterCharacterScripts/",
+    "studio_game/StarterPlayer/StarterPlayerScripts/"
   ],
   "non_synced_paths": [
-    "studio/StarterGui/",
-    "studio/StarterPack/",
-    "studio/Workspace/"
+    "studio_lobby/StarterGui/",
+    "studio_lobby/StarterPack/",
+    "studio_lobby/Workspace/",
+    "studio_game/StarterGui/",
+    "studio_game/StarterPack/",
+    "studio_game/Workspace/"
   ]
 }

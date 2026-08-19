@@ -12,3 +12,4 @@
 - [0010 — NPC crew fills missing human roles](0010-npc-crew.md)
 - [0011 — Multiplayer permanent progression belongs to every participant](0011-shared-expedition-rewards.md)
 - [0012 — Parts/components are primary permanent fleet progression](0012-parts-progression.md)
+- [0013 — Lobby place and game place](0013-two-places-lobby-and-game.md)
