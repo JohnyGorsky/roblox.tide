@@ -74,6 +74,22 @@ progression in their own account data.
    spending server-side exactly as the game place validates run actions.
 5. Never trust a client's claim about what it earned in the game place.
 
+## Settings
+
+Engine configuration for both places is specified in
+[settings-baseline.md](settings-baseline.md) — that table is the source of truth, since place settings
+live in the `.rbxl` where git cannot see them. Audit drift with
+[tools/audit-place-settings.luau](../../../tools/audit-place-settings.luau).
+
+Load-bearing consequences of that baseline:
+
+- Game place runs with **`StreamingEnabled = true`** → the boat controller **must** set each player's
+  `ReplicationFocus` to the vessel. The lobby has streaming off.
+- Game place runs with **`CharacterAutoLoads = false`** → the expedition owns death. Nothing respawns
+  unless the run says so.
+- Both places are **landscape-only** with a **DynamicThumbstick**, so HUD layout must avoid Roblox's
+  reserved bottom-left touch rect.
+
 ## Studio Sync — verified behavior
 
 Measured with MCP sync probes (tide job 003, 2026-08-19). These are **observations**, not conventions

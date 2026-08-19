@@ -70,6 +70,11 @@ The file suffix sets the class, **wherever the file sits**: `Name.luau` → `Mod
 literally named `Name.module`. A folder with an `init.luau` becomes that script, with its siblings
 parented under it.
 
+**Engine baseline** (job 004, spec in `settings-baseline.md`): the game place has
+`StreamingEnabled = true` — so the boat controller **must** set `ReplicationFocus` to the vessel — and
+`CharacterAutoLoads = false`, so the run owns death and nothing respawns unasked. The lobby has streaming **off** and normal auto-load. Both places are landscape-only with a
+DynamicThumbstick, so HUD work must avoid the reserved bottom-left touch rect.
+
 Six folders sync in **both** places — `ReplicatedFirst/`, `ReplicatedStorage/`,
 `ServerScriptService/`, `ServerStorage/`, `StarterPlayerScripts/`, `StarterCharacterScripts/`.
 `StarterGui/`, `StarterPack/` and `Workspace/` do not: that content is authored in Studio and lives
@@ -96,6 +101,7 @@ why: [decision 0013](../../../docs/decisions/0013-two-places-lobby-and-game.md).
 | Why an important choice was made (13 accepted) | `docs/decisions/` |
 | Compact catalogs — enemies, weapons, vessels, islands, loot, events, encounters, upgrades, parts, crew | `docs/content/` |
 | The two places and what lives in each | [systems/places/README.md](../../../docs/systems/places/README.md) |
+| Place settings spec (the `.rbxl` is invisible to git) | [systems/places/settings-baseline.md](../../../docs/systems/places/settings-baseline.md) |
 | Sequencing and release scope | `docs/roadmap/` (start with [poc.md](../../../docs/roadmap/poc.md)) |
 | Asset status | [assets/registry/assets.yaml](../../../assets/registry/assets.yaml) |
 | The game's own full instruction text | [CLAUDE.md](../../../CLAUDE.md) (does **not** auto-load — see below) |
