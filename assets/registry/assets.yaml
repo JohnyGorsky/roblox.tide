@@ -1,0 +1,44 @@
+assets:
+- id: ASSET-BOAT-STARTER
+  type: model
+  status: IDEA
+  source: meshy
+  roblox_path: ServerStorage.Assets.Boats.StarterBoat
+  feature: GAME-0001
+  notes: Battered motor launch / ex-military utility boat.
+- id: ASSET-RADAR-MK1
+  type: model
+  status: IDEA
+  source: meshy
+  roblox_path: ServerStorage.Assets.BoatModules.RadarMk1
+  feature: GAME-0002
+  notes: Keep rotating antenna as a separate movable part.
+- id: ASSET-SHARK-01
+  type: rig
+  status: IDEA
+  source: meshy
+  roblox_path: ServerStorage.Assets.Enemies.Shark
+  feature: GAME-0006
+  notes: Needs swim, bite, ram, hit and death animations.
+- id: ASSET-ISLAND-LIGHTHOUSE
+  type: island_template
+  status: IDEA
+  source: mixed
+  roblox_path: ServerStorage.Assets.Islands.Lighthouse
+  feature: GAME-0005
+  notes: Curated terrain + props + gameplay markers.
+- id: ASSET-PATROL-BOAT-01
+  type: model
+  status: IDEA
+  source: meshy
+  roblox_path: ServerStorage.Assets.Vessels.PatrolBoat01
+  feature: GAME-0008
+  notes: Future larger vessel; keep bridge/radar/hardpoints and possible interior
+    sections modular.
+- id: ASSET-NPC-ENGINEER-01
+  type: rig
+  status: IDEA
+  source: meshy
+  roblox_path: ServerStorage.Assets.Crew.Engineer01
+  feature: GAME-0009
+  notes: Needs repair, carry, idle, walk/run and interaction animations.

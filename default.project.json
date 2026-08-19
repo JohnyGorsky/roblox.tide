@@ -1,0 +1,34 @@
+{
+  "name": "roblox.tide",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedFirst": {
+      "$path": "studio/ReplicatedFirst"
+    },
+
+    "ReplicatedStorage": {
+      "$path": "studio/ReplicatedStorage"
+    },
+
+    "ServerScriptService": {
+      "$path": "studio/ServerScriptService"
+    },
+
+    "ServerStorage": {
+      "$path": "studio/ServerStorage"
+    },
+
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "$path": "studio/StarterPlayer/StarterPlayerScripts"
+      },
+      "StarterCharacterScripts": {
+        "$className": "StarterCharacterScripts",
+        "$path": "studio/StarterPlayer/StarterCharacterScripts"
+      }
+    }
+  }
+}

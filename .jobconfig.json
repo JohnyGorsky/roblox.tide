@@ -1,0 +1,16 @@
+{
+  "_comment": "The Last Tide syncs all scripts under a top-level `studio/` folder on disk (Jungle uses `sync/`; Defender mirrors services at the repo root). Used by ../roblox.workspace/tools/job.py for the final-summary sync table; order matters (synced_paths win over non_synced_paths). PROVISIONAL: no Roblox place exists yet - confirm these against the live Studio Explorer's sync arrows once the place is created and Studio Sync is connected.",
+  "synced_paths": [
+    "studio/ReplicatedFirst/",
+    "studio/ReplicatedStorage/",
+    "studio/ServerScriptService/",
+    "studio/ServerStorage/",
+    "studio/StarterPlayer/StarterCharacterScripts/",
+    "studio/StarterPlayer/StarterPlayerScripts/"
+  ],
+  "non_synced_paths": [
+    "studio/StarterGui/",
+    "studio/StarterPack/",
+    "studio/Workspace/"
+  ]
+}

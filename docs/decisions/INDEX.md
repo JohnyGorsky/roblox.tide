@@ -1,0 +1,14 @@
+# Accepted Design Decisions
+
+- [0001 — Third-person default](0001-third-person-default.md)
+- [0002 — Horizontal wrapped ocean](0002-horizontal-world-wrap.md)
+- [0003 — Curated islands](0003-curated-islands.md)
+- [0004 — Radar, no permanent minimap](0004-radar-no-permanent-minimap.md)
+- [0005 — Vessel is the mobile base](0005-boat-mobile-base.md)
+- [0006 — Day explore, night survive](0006-day-night-loop.md)
+- [0007 — Storm provides forward pressure](0007-storm-forward-pressure.md)
+- [0008 — Roguelite run reset + permanent options](0008-progression-model.md)
+- [0009 — Vessel-class architecture](0009-vessel-class-architecture.md)
+- [0010 — NPC crew fills missing human roles](0010-npc-crew.md)
+- [0011 — Multiplayer permanent progression belongs to every participant](0011-shared-expedition-rewards.md)
+- [0012 — Parts/components are primary permanent fleet progression](0012-parts-progression.md)
