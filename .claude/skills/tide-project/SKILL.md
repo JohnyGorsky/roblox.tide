@@ -60,6 +60,21 @@ Game = one expedition (vessel, ocean, storm, islands, enemies, in-run upgrades).
 their paths on purpose so no path is ambiguous about its owner. Permanent progression crosses the
 boundary as account data through DataStores; in-run power does not cross back.
 
+**Sync layout is FLAT** — service folders sit at the sync root, and `StarterPlayerScripts/` /
+`StarterCharacterScripts/` sit at the root too, *not* nested under `StarterPlayer/`. Verified by MCP
+probe: the nested form never syncs. Do not copy Jungle's nested `sync/StarterPlayer/…` shape.
+
+The file suffix sets the class, **wherever the file sits**: `Name.luau` → `ModuleScript`,
+`Name.server.luau` → `Script` with `RunContext = Server`, `Name.client.luau` → `Script` with
+`RunContext = Client`. `.module.luau` is **not** a recognised suffix — it yields a ModuleScript
+literally named `Name.module`. A folder with an `init.luau` becomes that script, with its siblings
+parented under it.
+
+Six folders sync in **both** places — `ReplicatedFirst/`, `ReplicatedStorage/`,
+`ServerScriptService/`, `ServerStorage/`, `StarterPlayerScripts/`, `StarterCharacterScripts/`.
+`StarterGui/`, `StarterPack/` and `Workspace/` do not: that content is authored in Studio and lives
+in the `.rbxl`, invisible to git.
+
 Detail: [docs/systems/places/README.md](../../../docs/systems/places/README.md) ·
 why: [decision 0013](../../../docs/decisions/0013-two-places-lobby-and-game.md).
 
@@ -115,6 +130,7 @@ roblox.tide/
   assets/              registry/assets.yaml, meshy/ records + template, references/palette/
   studio_lobby/        sync root for the LOBBY place (The Last Tide, 91870148721134)
   studio_game/         sync root for the GAME place (The Last Tide Game, 100885379547959)
+                       both FLAT: <Service>/ plus StarterPlayerScripts/ StarterCharacterScripts/
   lobby.project.json   Rojo mapping: DataModel -> studio_lobby/<Service>
   game.project.json    Rojo mapping: DataModel -> studio_game/<Service>
   .jobconfig.json      synced vs manual-copy paths, for job.py final summaries

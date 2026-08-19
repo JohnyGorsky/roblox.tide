@@ -74,9 +74,77 @@ progression in their own account data.
    spending server-side exactly as the game place validates run actions.
 5. Never trust a client's claim about what it earned in the game place.
 
+## Studio Sync — verified behavior
+
+Measured with MCP sync probes (tide job 003, 2026-08-19). These are **observations**, not conventions
+copied from another repo.
+
+### The layout is flat
+
+Service folders sit directly at the sync root, and `StarterPlayer`'s children are at the root too:
+
+```text
+studio_game/
+  ReplicatedFirst/
+  ReplicatedStorage/
+  ServerScriptService/
+  ServerStorage/
+  StarterPlayerScripts/         <- NOT StarterPlayer/StarterPlayerScripts/
+  StarterCharacterScripts/      <- NOT StarterPlayer/StarterCharacterScripts/
+```
+
+A probe in `studio_game/StarterPlayerScripts/` arrived at `StarterPlayer.StarterPlayerScripts`. The
+same probe under `studio_game/StarterPlayer/StarterPlayerScripts/` **never arrived**. Jungle's nested
+`sync/StarterPlayer/…` form is Rojo's convention, not this one — do not copy it here.
+
+### What syncs, per place
+
+Re-verified 2026-08-19 after sync was connected for both places. **Both places behave identically:**
+
+| Folder | Lobby | Game | Maps to |
+|---|---|---|---|
+| `ReplicatedFirst/` | ✅ | ✅ | `ReplicatedFirst` |
+| `ReplicatedStorage/` | ✅ | ✅ | `ReplicatedStorage` |
+| `ServerScriptService/` | ✅ | ✅ | `ServerScriptService` |
+| `ServerStorage/` | ✅ | ✅ | `ServerStorage` |
+| `StarterPlayerScripts/` | ✅ | ✅ | `StarterPlayer.StarterPlayerScripts` |
+| `StarterCharacterScripts/` | ✅ | ✅ | `StarterPlayer.StarterCharacterScripts` |
+| `StarterGui/` | ❌ | ❌ | manual copy — GUI is authored in Studio and lives in the `.rbxl` |
+| `StarterPack/` | ❌ | ❌ | manual copy |
+| `Workspace/` | ❌ | ❌ | manual copy — world content is authored in Studio |
+
+The non-synced three were measured in the first round and not re-probed after reconnection; treat them
+as unconfirmed rather than proven if it matters.
+
+### Script class comes from the file suffix
+
+| On disk | Becomes |
+|---|---|
+| `Name.luau` | `ModuleScript` |
+| `Name.server.luau` | `Script` with `RunContext = Server` |
+| `Name.client.luau` | `Script` with `RunContext = Client` |
+| `Name.module.luau` | ⚠️ `ModuleScript` literally named `Name.module` — **`.module` is not a recognised suffix** |
+
+The suffix sets `RunContext` regardless of where the file sits: a `.client.luau` dropped into
+`ServerScriptService/` becomes a `Script` with `RunContext = Client`, which will not do what its
+location suggests. Put client code in `StarterPlayerScripts/`.
+
+### Folders and `init.luau`
+
+- A subfolder becomes a `Folder` instance, nested as deep as you like.
+- A folder containing `init.luau` becomes the **script itself** rather than a `Folder` — the folder's
+  other children are parented under it. `ReplicatedStorage/Nested/init.luau` produced
+  `ReplicatedStorage.Nested` as a `ModuleScript` with `Nested.Deeper` (a `Folder`) inside it. Use this
+  for a module that owns submodules.
+
+Deletions propagate: removing a file removes the instance, leaving no residue. `.gitkeep` files are
+ignored by the sync entirely.
+
 ## Current state
 
-Both places exist and are **empty** — created 2026-08-19, no content or scripts yet. The
+Both places exist and are **empty** — created 2026-08-19, no content or scripts yet: a baseplate,
+a spawn and terrain in each, and nothing in any service. Both are open in Studio and reachable over
+MCP; they share one experience (`gameId 10741898001`). The
 what-lives-where split above is *intent* derived from `docs/systems/shipyard/README.md` and
 `docs/game/progression.md`, not an observation. Inspect Studio through MCP before treating any of it as
 implemented, and correct this document when the real structure exists.

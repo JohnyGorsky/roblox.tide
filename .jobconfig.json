@@ -1,18 +1,18 @@
 {
-  "_comment": "The Last Tide has TWO places, each with its own sync root and Rojo project: studio_lobby/ = 'The Last Tide' (91870148721134, start place, lobby.project.json) and studio_game/ = 'The Last Tide Game' (100885379547959, game.project.json). Both places are named in their paths on purpose - neither is an unnamed default - so the owning place is unmistakable from any file path. Jungle uses sync/ vs lobby/sync/; Defender mirrors services at the repo root. Used by ../roblox.workspace/tools/job.py for the final-summary sync table; order matters (synced_paths win over non_synced_paths). PROVISIONAL: both places are still empty, so these paths follow convention rather than observed sync arrows - confirm against the live Studio Explorer once Studio Sync is connected (todo 0000).",
+  "_comment": "The Last Tide has TWO places, each with its own sync root: studio_lobby/ = 'The Last Tide' (91870148721134, start place) and studio_game/ = 'The Last Tide Game' (100885379547959). LAYOUT IS FLAT: service folders sit directly at the sync root, and StarterPlayer's children are StarterPlayerScripts/ and StarterCharacterScripts/ at the root - NOT nested under StarterPlayer/. Proven by MCP sync probes (tide job 003): the nested form never syncs. Jungle's nested sync/StarterPlayer/... shape is Rojo's convention, not this one. Every path below was OBSERVED, not assumed - re-verified 2026-08-19 after both places were connected, and both places behave identically. Order matters (synced_paths win over non_synced_paths). File suffix sets the class: .luau = ModuleScript, .server.luau = Script/RunContext=Server, .client.luau = Script/RunContext=Client; .module.luau is NOT a recognised suffix.",
   "synced_paths": [
     "studio_lobby/ReplicatedFirst/",
     "studio_lobby/ReplicatedStorage/",
     "studio_lobby/ServerScriptService/",
     "studio_lobby/ServerStorage/",
-    "studio_lobby/StarterPlayer/StarterCharacterScripts/",
-    "studio_lobby/StarterPlayer/StarterPlayerScripts/",
+    "studio_lobby/StarterPlayerScripts/",
+    "studio_lobby/StarterCharacterScripts/",
     "studio_game/ReplicatedFirst/",
     "studio_game/ReplicatedStorage/",
     "studio_game/ServerScriptService/",
     "studio_game/ServerStorage/",
-    "studio_game/StarterPlayer/StarterCharacterScripts/",
-    "studio_game/StarterPlayer/StarterPlayerScripts/"
+    "studio_game/StarterPlayerScripts/",
+    "studio_game/StarterCharacterScripts/"
   ],
   "non_synced_paths": [
     "studio_lobby/StarterGui/",

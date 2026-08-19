@@ -1,7 +1,7 @@
 # FINDING 0000: Stray empty folders at the wrong level in studio_game/
 
 **Project:** `roblox.tide`
-**Status:** open
+**Status:** fixed (2026-08-19) — NOT A DEFECT - my diagnosis was backwards. MCP sync probes (job 003) proved Studio Sync uses a FLAT layout: studio_game/StarterPlayerScripts/ syncs to StarterPlayer.StarterPlayerScripts, while the nested studio_game/StarterPlayer/StarterPlayerScripts/ never syncs at all. So the two folders I called stray were created by Studio Sync itself and are the CANONICAL ones; the nested pair I created in job 002 were the dead ones. Job 003 deleted the nested tree and flattened both sync roots to match.
 **Severity:** med
 **Created:** 2026-08-19 22:30:21
 
