@@ -95,8 +95,10 @@ export type Spec = {
 	heelOutDeg: number,
 	--- Backstop against a knockdown. NOT the righting mechanism - buoyancy geometry is (see the spec).
 	rightingTorque: number,
-	--- Bow-up moment at full throttle. Models hydrodynamic trim, which nothing else here simulates.
-	trimTorque: number,
+	--- Degrees of SUSTAINED bow-up while under power (planing attitude).
+	planingTrimDeg: number,
+	--- Degrees of bow-up at full acceleration - and bow-DOWN when decelerating. The inertial reaction.
+	inertialTrimDeg: number,
 	fuelCapacity: number,
 	--- Litres-ish per second at full throttle.
 	fuelBurn: number,
@@ -233,22 +235,30 @@ local STARTER_LAUNCH: Spec = {
 		hydrostatics has lost its lever.
 	]]
 	rightingTorque = 250000,
-	--[[
-		BOW RISE UNDER POWER, and it has to be modelled explicitly rather than left to emerge.
+--[[
+		TRIM: how the hull sits fore-and-aft. TWO separate effects, because a hull does two different things.
 
-		Measured: pitch stiffness fore-aft is 1,022,683 N-stud per degree. Applying thrust below the centre of
-		mass - the intuitive way to get a bow-up moment - gives at most 68,000, which is 0.07 degrees. Utterly
-		invisible. No arrangement of a 34,000 N thrust and a hull this stiff will lift the bow.
+		🔴 PLANING trim (sustained). While the engine is pushing, the stern squats and the bow lifts and STAYS
+		lifted. Driven by throttle, so it holds at steady cruise.
 
-		That is not a failure of the approach, it is a missing phenomenon: a real hull rises because of
-		HYDRODYNAMIC lift at the stern as it gains speed, which nothing here simulates. So the trim is applied
-		as a deliberate torque scaled by throttle - modelling the effect directly instead of hoping a static
-		lever arm produces it.
+		🔴 INERTIAL trim (transient). This is the half that was missing, and the user spotted it: accelerating
+		throws the bow UP and the stern DOWN; DECELERATING does the reverse - the bow digs in and the stern
+		lifts. It is the reaction to the change in speed, so it is driven by the NET longitudinal force, not by
+		the throttle. Chopping the throttle at speed therefore digs the nose in, because drag is now the only
+		longitudinal force and it points aft.
 
-		4 degrees at full ahead: enough to see and to feel, not enough to look like a speedboat popping a
-		wheelie.
+		Together:
+		    opening up from rest   planing + inertial   -> strong bow-up
+		    steady at cruise       planing only         -> moderate bow-up
+		    throttle chopped       inertial only, aft   -> bow digs in, stern rises
+		    coasting slowly        neither              -> level
+
+		Both are expressed in DEGREES against the measured pitch stiffness of 1,022,683 N-stud per degree, so
+		these numbers mean what they say. Neither can emerge from a thrust lever arm: the best that offers is
+		0.07 degrees on a hull this stiff, which is why trim is modelled directly.
 	]]
-	trimTorque = 4 * 1022683,
+	planingTrimDeg = 2.5,
+	inertialTrimDeg = 3.5,
 	fuelCapacity = 100,
 	fuelBurn = 0.55,
 	--[[

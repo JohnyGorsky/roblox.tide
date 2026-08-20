@@ -63,6 +63,8 @@ local state = {
 	rudderAuthority = 0,
 	heelIn = 0,
 	heelOut = 0,
+	planingTrim = 0,
+	inertialTrim = 0,
 	maxDepth = 0,
 	console = nil :: BasePart?,
 	prompt = nil :: ProximityPrompt?,
@@ -141,6 +143,16 @@ local function buildVessel()
 		Roll stiffness is `2 * K * lever^2` per radian for the two float points either side, which for this
 		hull is 120,844 N-stud per degree. Deriving it means the spec can say "4 degrees" and mean it.
 	]]
+	--[[
+		Pitch stiffness fore-and-aft, from the float geometry, so the trim angles in the spec mean degrees.
+		Same derivation as the roll stiffness below, using the fore-aft lever instead of the beam.
+	]]
+	local pitchLever = math.abs(spec.buoyancyPoints[1].Z)
+	local pitchPerDeg = 2 * state.stiffness * (pitchLever * math.sin(math.rad(1))) * pitchLever
+	state.planingTrim = spec.planingTrimDeg * pitchPerDeg
+	-- scaled by force, so full thrust gives the full angle and drag-only gives it bow-down
+	state.inertialTrim = (spec.inertialTrimDeg * pitchPerDeg) / math.max(spec.thrust, 1)
+
 	local lever = math.abs(spec.buoyancyPoints[1].X)
 	local rollStiffnessPerDeg = 2 * state.stiffness * (lever * math.sin(math.rad(1))) * lever
 	state.heelIn = (spec.heelInDeg * rollStiffnessPerDeg) / math.max(state.rudderAuthority, 1)
@@ -581,16 +593,24 @@ local function step(dt: number)
 		forward throttle, because backing down should squat the stern, not lift it.
 	]]
 	if state.trim then
-		local t = math.max(throttle, 0)
+		--[[
+			TWO terms (see the spec):
+			  planing  - sustained bow-up while the engine pushes. Throttle-driven, holds at cruise.
+			  inertial - the reaction to CHANGING speed. Net-force-driven, so it lifts the bow under
+			             acceleration and DIGS IT IN under deceleration, which is the half that was missing.
+		]]
+		local planing = state.planingTrim * math.max(throttle, 0)
+		local inertial = state.inertialTrim * net
+		local moment = planing + inertial
 		--[[
 			Aimed along the hull's STARBOARD direction flattened to horizontal, so it is a pure pitch about a
-			horizontal axis and cannot leak into yaw at any angle of heel. Bow-up is a positive moment about
-			starboard.
+			horizontal axis and cannot leak into yaw at any angle of heel (finding 0019). Bow-up is a positive
+			moment about starboard.
 		]]
 		local right = hull.CFrame.RightVector
 		local flatRight = Vector3.new(right.X, 0, right.Z)
 		if flatRight.Magnitude > 0.01 then
-			state.trim.Torque = flatRight.Unit * (state.spec.trimTorque * t)
+			state.trim.Torque = flatRight.Unit * moment
 		else
 			state.trim.Torque = Vector3.zero
 		end
