@@ -17,10 +17,16 @@ Faded reality
 ## Palette
 
 ### Ocean/world
-- Abyss Navy `#0B1E2D`
-- Deep Ocean Blue `#12354A`
-- Storm Teal `#1E5A6E`
-- Cold Sea Mist `#6E8E99`
+
+Listed **darkest first** — the ocean ramp must fall as the sea worsens, and a colour's *name* is not a
+reliable guide to where it sits (measured luminance in brackets). This tripped us once: Storm Teal is the
+*lightest* of the three despite its name, and using it for a rough sea made the water visibly brighten as
+conditions turned nasty. It belongs to **shallow, sheltered water** — the harbour uses it correctly.
+
+- Abyss Navy `#0B1E2D` (0.106) — storm seas, the deep
+- Deep Ocean Blue `#12354A` (0.185) — open water, normal conditions
+- Storm Teal `#1E5A6E` (0.309) — **shallow/sheltered**, not rough
+- Cold Sea Mist `#6E8E99` (0.462) — haze and distance, not water body
 
 ### Sky/storm
 - Thunder Cloud `#2A313B`

@@ -187,7 +187,7 @@ Not art. The machinery that makes the above swappable.
 | Module mount/unmount | Attach, weld, wire up, tear down cleanly | ❌ | code |
 | Module state replication | Server-authoritative module state to clients | ❌ | code |
 | Visual upgrade swapping | A late-run vessel must look dramatically different | ❌ | code |
-| Buoyancy config per hull | Volume, density, righting moment | ❌ | code |
+| Buoyancy config per hull | Volume, density, righting moment. ⚠️ **Hull parts must be non-buoyant to the engine** (or its contribution explicitly accounted for): terrain-water auto-buoyancy pulls toward a flat Y=0 plane and will fight the wave field, and the symptom looks like jitter rather than a conflict — finding 0008 | ❌ | code |
 | Mass & COM management | Massless decor, low COM, cargo affecting trim | ❌ | code |
 | Network ownership policy | Server-owned while the server computes buoyancy — a known trap | ❌ | code |
 | **ReplicationFocus on the vessel** | Streaming is on; without this the deck streams out for distant crew | ❌ | code |

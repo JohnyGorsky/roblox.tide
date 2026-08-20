@@ -99,7 +99,7 @@ tools.setWater = {
 	controls = {
 		kind = "sliders",
 		fields = {
-			{ key = "waveSize", label = "Wave size (engine caps at 1)", min = 0, max = 1, step = 0.01 },
+			{ key = "waveSize", label = "Wave size", min = 0, max = 2, step = 0.01 },
 			{ key = "waveSpeed", label = "Wave speed", min = 0, max = 40, step = 0.5 },
 			{ key = "reflectance", label = "Reflectance", min = 0, max = 1, step = 0.01 },
 			{ key = "transparency", label = "Transparency", min = 0, max = 1, step = 0.01 },
@@ -113,7 +113,7 @@ tools.setWater = {
 		end
 		local T = workspace.Terrain
 		if key == "waveSize" then
-			T.WaterWaveSize = math.clamp(value, 0, 1) -- engine caps at 1; above that it silently clamps
+			T.WaterWaveSize = math.clamp(value, 0, 2)
 		elseif key == "waveSpeed" then
 			T.WaterWaveSpeed = math.clamp(value, 0, 100)
 		elseif key == "reflectance" then
@@ -486,58 +486,6 @@ tools.atmosphereDecay = paletteTool("atmosphereDecay", "Atmosphere decay", funct
 		(atm :: any).Decay = c
 	end
 end)
-
---[[
-	Spawn on demand.
-
-	The game place runs with CharacterAutoLoads = false on purpose: the expedition owns death, and nothing
-	may respawn behind the run's back. The side effect is that pressing Play gives you no body at all, no
-	camera subject, and an apparently dead session.
-
-	This is the deliberate opt-in. It does not change the setting - it asks for a character explicitly,
-	which is exactly the contract the rule describes.
-]]
-tools.spawnMe = {
-	id = "spawnMe",
-	label = "Spawn me a character",
-	section = "Diagnostics",
-	scope = "local",
-	controls = { kind = "button", output = "text" },
-	run = function(player: Player, _args: any)
-		local Players = game:GetService("Players")
-		local ok, err = pcall(function()
-			player:LoadCharacter()
-		end)
-		if not ok then
-			return false, "LoadCharacter failed: " .. tostring(err)
-		end
-
-		-- Put them somewhere standable rather than in the water.
-		local deck = workspace:FindFirstChild("GB_ObservationDeck")
-		local char = player.Character
-		local root = char and char:FindFirstChild("HumanoidRootPart")
-		if root and deck and deck:IsA("BasePart") then
-			(root :: BasePart).CFrame = CFrame.new(deck.Position + Vector3.new(0, deck.Size.Y / 2 + 4, 0))
-			return true, ("spawned on %s (autoload stays off - this was an explicit request)"):format(deck.Name)
-		end
-		return true, "spawned. No observation deck found, so you may be swimming."
-	end,
-}
-
-tools.despawnMe = {
-	id = "despawnMe",
-	label = "Remove my character",
-	section = "Diagnostics",
-	scope = "local",
-	controls = { kind = "button" },
-	run = function(player: Player, _args: any)
-		if player.Character then
-			player.Character:Destroy()
-			return true, "character removed (autoload is off, so nothing will bring it back)"
-		end
-		return true, "you had no character"
-	end,
-}
 
 tools.placeInfo = {
 	id = "placeInfo",

@@ -131,7 +131,7 @@ that exist in Studio but were never registered.
 - [x] **009** Build the admin gate, panel shell and sea tools
 - [x] **010** Give the lobby water and remove both baseplates
 - [x] **011** Record decisions 0014-0017: storm consequence, shared rig, island storage, deck navigation
-- [ ] **012** Wave field: HeightAt / NormalAt for the sea surface
+- [x] **012** Wave field: HeightAt / NormalAt for the sea surface
 - [x] **013** Admin panel: atmosphere and palette colour controls
 
 An unchecked job is still in flight.

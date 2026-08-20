@@ -20,8 +20,12 @@ Roblox terrain water gives us, for free:
 - **automatic buoyancy and drag** on unanchored parts (float/sink threshold is density vs 1.0)
 - swimming, and the underwater look
 
-What it does **not** give us: **its waves do not move objects.** The visual swell is a rendering effect;
-a boat sitting on it stays flat and level. So the sea splits into three layers that must be kept in
+What it does **not** give us: **its waves do not move objects — and nothing can even measure them.**
+Proven 2026-08-20: a raycast against terrain water returns a flat plane at `WATER_Y` regardless of
+position, time, or `WaterWaveSize` (0.000000 spread across 450 studs, and still 0.0000 at the maximum
+wave size of 1.4). The swell is a pure shader effect. A boat sitting on it stays flat and level, and the
+engine's own auto-buoyancy floats things toward that flat plane — which is why it will **fight** a
+wave-field-driven hull (finding 0008). So the sea splits into three layers that must be kept in
 agreement:
 
 | Layer | What it is | Who owns it |

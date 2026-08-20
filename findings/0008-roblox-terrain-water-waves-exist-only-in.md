@@ -1,0 +1,11 @@
+# FINDING 0008: Roblox terrain-water waves exist only in the shader - nothing can query them
+
+**Project:** `roblox.tide`
+**Status:** open
+**Severity:** med
+**Created:** 2026-08-20 13:03:20
+
+**Symptom:** Proven in job 012, and it changes what wave calibration can ever be. A raycast against Terrain water returns a perfectly FLAT plane at WATER_Y regardless of everything: 12 raycasts spread across 450 studs gave spread 0.000000; the same point sampled repeatedly over half a second gave spread 0.000000; and setting WaterWaveSize to its maximum 1.4 still returned exactly 0.0000. The rendered swell is a pure shader effect with no presence in the queryable or collidable geometry at all. THREE CONSEQUENCES. (1) The rendered wave height cannot be measured by any API - only judged by eye against a physical ruler in a screenshot - so exact numeric calibration between our wave field and the visuals is impossible in principle, not merely fiddly. The acceptance criterion has to be an impression of matching envelope, and the tolerance is generous because nothing in the engine can betray a discrepancy except the player's eye. (2) Our WaveField is therefore not one of two truths, it is the ONLY non-flat truth about the sea; Roblox's own systems all believe the water is flat. (3) MOST IMPORTANT, and a direct warning for GAME-0001: Roblox terrain-water auto-buoyancy floats objects toward that flat Y=0 plane, so a vessel driven by our wave field must NOT also rely on auto-buoyancy - the two will fight, one pulling to a flat plane while the other pushes to a moving crest, and the symptom will look like inexplicable bobbing or jitter rather than a design conflict. The roblox-physics skill already says do not rely on terrain-water auto-buoyancy alone; this is the mechanism behind that advice. Hull parts driven by the wave field should be non-buoyant to the engine, or the engine's contribution must be explicitly accounted for.
+**Where:** _TODO: file / system_
+**Repro / notes:** _TODO_
+**Fix idea:** _TODO_

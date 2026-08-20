@@ -52,21 +52,53 @@ export type SkySpec = {
 	brightness: number,
 }
 
+--[[
+	Atmosphere is the DOMINANT lever on how the sea reads.
+
+	Job 007 tried four ways to recolour the ocean through water properties and fog and all four failed;
+	the sky and the air win. So every state carries its own air, not just its own water. Without this
+	block, switching state changed the water and the fog while the atmosphere stayed put - which made the
+	five states look far more alike than they are.
+
+	Measured landmark from that job: haze above about 2 flattens ALL wave detail. Storm and The Wall sit
+	at 2.0 deliberately, not higher.
+]]
+export type AtmosphereSpec = {
+	density: number,
+	offset: number,
+	haze: number,
+	glare: number,
+	color: Color3,
+	decay: Color3,
+}
+
 export type SeaState = {
 	id: string,
 	name: string,
 	description: string,
 	water: WaterSpec,
 	sky: SkySpec,
+	atmosphere: AtmosphereSpec,
 	wave: WaveSpec,
 	spray: number, -- 0..1 drives whitecap/spray density in the VFX layer
 	audioBed: string, -- key into the audio registry (group 12)
 }
 
 -- Palette anchors from docs/game/visual-design.md
-local ABYSS_NAVY = Color3.fromRGB(11, 30, 45)
-local DEEP_OCEAN = Color3.fromRGB(18, 53, 74)
-local STORM_TEAL = Color3.fromRGB(30, 90, 110)
+--[[
+	The ocean ramp must get DARKER as the sea worsens. Measured luminance, so this is not a matter of
+	taste: Abyss Navy 0.106, Deep Ocean 0.185, Storm Teal 0.309.
+
+	Storm Teal is the LIGHTEST of the three despite its name - it belongs to shallow, sheltered water
+	(it is what the harbour uses), not to a worsening sea. Assigning it to Choppy made the ramp read
+	0.185 -> 0.185 -> 0.309 -> 0.106, so the sea visibly brightened just as it turned nasty. Caught by
+	screenshot, then confirmed by computing the luminances.
+]]
+local ABYSS_NAVY = Color3.fromRGB(11, 30, 45) -- luminance 0.106
+local DEEP_OCEAN = Color3.fromRGB(18, 53, 74) -- luminance 0.185
+local STORM_TEAL = Color3.fromRGB(30, 90, 110) -- luminance 0.309 - SHALLOW water, not rough water
+local CHOP_BLUE = Color3.fromRGB(15, 42, 58) -- between Deep Ocean and Abyss Navy
+local WALL_BLACK = Color3.fromRGB(8, 20, 30) -- darker than Abyss Navy; the sea at its worst
 local COLD_MIST = Color3.fromRGB(110, 142, 153)
 local THUNDER_CLOUD = Color3.fromRGB(42, 49, 59)
 local WET_STEEL = Color3.fromRGB(75, 89, 100)
@@ -95,6 +127,11 @@ SeaStates.DeadCalm = {
 		outdoorAmbient = 1.0,
 		brightness = 2.6,
 	},
+	atmosphere = {
+		density = 0.30, offset = 0.25, haze = 0.6, glare = 0.05,
+		color = Color3.fromRGB(150, 165, 175), -- pale, clean air: you can see for miles, which is the problem
+		decay = Color3.fromRGB(86, 100, 112),
+	},
 	wave = { amplitude = 0.15, length = 90, speed = 4, choppiness = 0.0, directionSpread = 0.1, directionDeg = 0 },
 	spray = 0.0,
 	audioBed = "sea_dead_calm",
@@ -119,6 +156,11 @@ SeaStates.LightSwell = {
 		outdoorAmbient = 1.0,
 		brightness = 3.0,
 	},
+	atmosphere = {
+		density = 0.45, offset = 0.30, haze = 1.4, glare = 0.05,
+		color = Color3.fromRGB(132, 145, 154),
+		decay = Color3.fromRGB(58, 68, 80),
+	},
 	wave = { amplitude = 0.8, length = 70, speed = 11, choppiness = 0.2, directionSpread = 0.2, directionDeg = 8 },
 	spray = 0.1,
 	audioBed = "sea_light_swell",
@@ -130,7 +172,7 @@ SeaStates.Choppy = {
 	name = "Choppy",
 	description = "A working sea. The deck moves, spray starts, the horizon closes in.",
 	water = {
-		color = STORM_TEAL,
+		color = CHOP_BLUE, -- NOT Storm Teal: see the ramp note above
 		reflectance = 0.22,
 		transparency = 0.18,
 		waveSize = 0.45,
@@ -142,6 +184,11 @@ SeaStates.Choppy = {
 		fogColor = WET_STEEL,
 		outdoorAmbient = 0.85,
 		brightness = 2.4,
+	},
+	atmosphere = {
+		density = 0.52, offset = 0.30, haze = 1.4, glare = 0.05,
+		color = Color3.fromRGB(120, 132, 141),
+		decay = Color3.fromRGB(58, 68, 80),
 	},
 	wave = { amplitude = 2.0, length = 55, speed = 15, choppiness = 0.5, directionSpread = 0.4, directionDeg = 15 },
 	spray = 0.35,
@@ -167,6 +214,11 @@ SeaStates.Storm = {
 		outdoorAmbient = 0.55,
 		brightness = 1.6,
 	},
+	atmosphere = {
+		density = 0.62, offset = 0.20, haze = 2.0, glare = 0.02, -- haze at the 2.0 ceiling, not past it
+		color = Color3.fromRGB(86, 96, 105),
+		decay = Color3.fromRGB(30, 36, 44),
+	},
 	wave = { amplitude = 4.5, length = 45, speed = 20, choppiness = 0.8, directionSpread = 0.6, directionDeg = 22 },
 	spray = 0.75,
 	audioBed = "sea_storm",
@@ -181,10 +233,13 @@ SeaStates.TheWall = {
 	name = "The Wall",
 	description = "Inside the front. Near-zero visibility, violent water, no way to hold position.",
 	water = {
-		color = ABYSS_NAVY,
+		color = WALL_BLACK,
 		reflectance = 0.08,
 		transparency = 0.05,
-		waveSize = 1.4,
+		-- Terrain.WaterWaveSize is CAPPED AT 1.0 by the engine. This asked for 1.4 and silently got 1.0,
+		-- verified by read-back. So 1.0 is the roughest the RENDER can look; extra violence in The Wall
+		-- has to come from the wave field, spray and camera shake, not from this dial.
+		waveSize = 1.0,
 		waveSpeed = 28,
 	},
 	sky = {
@@ -193,6 +248,11 @@ SeaStates.TheWall = {
 		fogColor = Color3.fromRGB(26, 30, 36),
 		outdoorAmbient = 0.35,
 		brightness = 1.0,
+	},
+	atmosphere = {
+		density = 0.85, offset = 0.10, haze = 2.0, glare = 0.0,
+		color = Color3.fromRGB(70, 78, 88),
+		decay = Color3.fromRGB(24, 29, 36),
 	},
 	wave = { amplitude = 7.5, length = 38, speed = 26, choppiness = 1.0, directionSpread = 0.9, directionDeg = 30 },
 	spray = 1.0,
@@ -272,6 +332,14 @@ function SeaStates.lerp(a: SeaState, b: SeaState, t: number): SeaState
 			outdoorAmbient = n(a.sky.outdoorAmbient, b.sky.outdoorAmbient),
 			brightness = n(a.sky.brightness, b.sky.brightness),
 		},
+		atmosphere = {
+			density = n(a.atmosphere.density, b.atmosphere.density),
+			offset = n(a.atmosphere.offset, b.atmosphere.offset),
+			haze = n(a.atmosphere.haze, b.atmosphere.haze),
+			glare = n(a.atmosphere.glare, b.atmosphere.glare),
+			color = c(a.atmosphere.color, b.atmosphere.color),
+			decay = c(a.atmosphere.decay, b.atmosphere.decay),
+		},
 		wave = {
 			amplitude = n(a.wave.amplitude, b.wave.amplitude),
 			length = n(a.wave.length, b.wave.length),
@@ -313,6 +381,18 @@ function SeaStates.apply(state: SeaState)
 		math.clamp(a.G * m, 0, 1),
 		math.clamp(a.B * m, 0, 1)
 	)
+
+	-- The air. This is what actually makes the states look different from each other.
+	local atm = Lighting:FindFirstChildOfClass("Atmosphere")
+	if atm and state.atmosphere then
+		local at = state.atmosphere
+		atm.Density = at.density
+		atm.Offset = at.offset
+		atm.Haze = at.haze
+		atm.Glare = at.glare
+		atm.Color = at.color
+		atm.Decay = at.decay
+	end
 end
 
 return SeaStates

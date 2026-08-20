@@ -37,6 +37,29 @@ objects at all. So the sea has two independent truths:
 If these disagree the illusion breaks in a very specific, very visible way: the hull climbs a crest that
 is not there, or punches through one that is.
 
+### Proven 2026-08-20: the rendered swell exists *only* in the shader
+
+A raycast against terrain water returns a perfectly flat plane at `WATER_Y`, always. Measured: 12
+raycasts across 450 studs gave a spread of **0.000000**; the same point sampled repeatedly over half a
+second gave **0.000000**; and `WaterWaveSize` at its maximum of 1.4 still returned exactly **0.0000**.
+
+So this module is not one of two truths — **it is the only non-flat truth about the sea.** Every Roblox
+system believes the water is a flat plane at Y=0.
+
+Three consequences:
+
+1. **Exact calibration is impossible in principle**, not merely fiddly. Nothing can report the rendered
+   height, so it can only be judged by eye against a physical ruler in a screenshot. The tolerance is
+   generous, because nothing in the engine can betray a mismatch except the player.
+2. **⚠️ Auto-buoyancy will fight this field.** Terrain water floats objects toward that flat Y=0 plane. A
+   hull driven by `WaveField` while also subject to engine buoyancy has two systems pulling it to
+   different heights — one to a flat plane, one to a moving crest. The symptom looks like inexplicable
+   bobbing, not a design conflict. **GAME-0001 must make hull parts non-buoyant to the engine, or account
+   for the engine's contribution explicitly.** This is the mechanism behind the `roblox-physics` advice not
+   to rely on terrain-water auto-buoyancy.
+3. Debris and props that only need to *look* afloat can keep using auto-buoyancy — it is free, and at
+   Y=0 it is close enough for anything small.
+
 `SeaStates.luau` already carries a `wave` block per state — amplitude, length, speed, choppiness,
 direction spread — precisely so both truths come from one table. This feature is the consumer of that
 block.
@@ -64,8 +87,10 @@ We cannot change the *shape* of Roblox's visual waves, so the field has to be fi
 the reverse. For each sea state:
 
 1. Set the state's `WaterWaveSize` / `WaterWaveSpeed`.
-2. Measure the **apparent** amplitude and wavelength of the rendered water — a line of thin markers at
-   known heights, read from a screenshot at water level, is enough.
+2. Measure the **apparent** amplitude and wavelength of the rendered water with a **vertical ruler**: a
+   ladder of thin markers at known Y values, screenshotted from water level, so it is visible which
+   height the crests actually reach. This is the only way in — the rendered amplitude is not readable
+   from any property; `WaterWaveSize` is a dimensionless dial, not studs.
 3. Tune that state's `wave.amplitude` / `wave.length` / `wave.speed` to match what the eye sees.
 4. Record the measured numbers as comments beside the values, so a later change knows what it is breaking.
 
@@ -100,13 +125,26 @@ Whitecaps, spray and wake belong to group 01's surface-detail job, though they w
 ## Acceptance criteria
 
 - [ ] Server and a client sampling the same `(x, z, t)` return the same height to within a rounding error
-- [ ] Debug markers visually sit on the rendered water surface in every sea state, not above or below it
+- [ ] Debug markers' **envelope and wavelength** match the rendered water in every sea state
+      *(corrected 2026-08-20: the original wording said markers must "sit on the rendered surface", which is
+      impossible — Roblox does not expose its water's wave phase, so our field can never be phase-aligned
+      to it. What is achievable, and what actually matters, is that the crest-to-trough range and the
+      apparent distance between crests agree. Point-for-point alignment is not a goal.)*
 - [ ] Switching or blending states moves the surface smoothly
 - [ ] 12 samples per frame cost is measured and acceptable on a phone
 - [ ] Sampling far outside the ocean returns `WATER_Y` and never errors
 
 ## Verification
 
-Never mark VERIFIED without a real Studio check. The specific test that matters: **stand the debug grid on
-the water in all five states and screenshot each.** If the markers float or sink, the field and the visuals
-disagree and the boat will look wrong later.
+Never mark VERIFIED without a real Studio check. The specific test that matters: **put the debug grid and
+the ruler on the water in all five states and screenshot each.** Compare the marker cloud's vertical
+*envelope* against where the rendered crests reach on the ruler. If the envelopes disagree, the boat will
+climb crests that are not there.
+
+Do **not** expect the markers to sit on individual visible crests — see the corrected criterion above.
+
+Already verified in Edit (job 012, 2026-08-20): determinism identical across repeat calls; `directionDeg`
+present on all five states and interpolated by `lerp`; out-of-bounds returns `WATER_Y`, never `nan`;
+normals vertical in Dead Calm (y = 1.00000) and tilted in The Wall (y = 0.88); measured crest-to-trough
+86–98% of `amplitude × 2`, the shortfall being finite-grid sampling rather than a normalisation error;
+12 `HeightAt` calls cost 0.0126 ms, which is 0.08% of a 60 fps frame.

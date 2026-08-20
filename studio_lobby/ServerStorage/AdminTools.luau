@@ -82,56 +82,7 @@ local hasSea = ReplicatedStorage:FindFirstChild("SeaStates") ~= nil
 
 if hasSea then
 
-tools.setSeaState = {
-	id = "setSeaState",
-	label = "Sea state",
-	section = "Sea",
-	scope = "global", -- a sea only one person can see cannot be judged
-	controls = { kind = "choice", options = { "DeadCalm", "LightSwell", "Choppy", "Storm", "TheWall" } },
-	run = function(_player: Player, args: any)
-		local SeaStates = seaStates()
-		if not SeaStates then
-			return false, "SeaStates module not found in ReplicatedStorage"
-		end
-		local id = args and args.value
-		if typeof(id) ~= "string" then
-			return false, "expected a state id"
-		end
-		local state = SeaStates.get(id)
-		if not state then
-			return false, ("unknown sea state %q"):format(tostring(id))
-		end
-		SeaStates.apply(state)
-		return true, ("applied %s"):format(state.name)
-	end,
-}
 
-tools.blendSeaStates = {
-	id = "blendSeaStates",
-	label = "Blend A→B",
-	section = "Sea",
-	scope = "global",
-	controls = {
-		kind = "blend",
-		options = { "DeadCalm", "LightSwell", "Choppy", "Storm", "TheWall" },
-	},
-	run = function(_player: Player, args: any)
-		local SeaStates = seaStates()
-		if not SeaStates then
-			return false, "SeaStates module not found"
-		end
-		local a, b, t = args and args.a, args and args.b, args and args.t
-		if typeof(a) ~= "string" or typeof(b) ~= "string" or typeof(t) ~= "number" then
-			return false, "expected a, b (state ids) and t (0..1)"
-		end
-		local sa, sb = SeaStates.get(a), SeaStates.get(b)
-		if not sa or not sb then
-			return false, "unknown state id"
-		end
-		SeaStates.apply(SeaStates.lerp(sa, sb, math.clamp(t, 0, 1)))
-		return true, ("blended %s -> %s at %.2f"):format(a, b, t)
-	end,
-}
 
 --[[
 	Live water and fog sliders.
@@ -148,7 +99,7 @@ tools.setWater = {
 	controls = {
 		kind = "sliders",
 		fields = {
-			{ key = "waveSize", label = "Wave size", min = 0, max = 2, step = 0.01 },
+			{ key = "waveSize", label = "Wave size (engine caps at 1)", min = 0, max = 1, step = 0.01 },
 			{ key = "waveSpeed", label = "Wave speed", min = 0, max = 40, step = 0.5 },
 			{ key = "reflectance", label = "Reflectance", min = 0, max = 1, step = 0.01 },
 			{ key = "transparency", label = "Transparency", min = 0, max = 1, step = 0.01 },
@@ -162,7 +113,7 @@ tools.setWater = {
 		end
 		local T = workspace.Terrain
 		if key == "waveSize" then
-			T.WaterWaveSize = math.clamp(value, 0, 2)
+			T.WaterWaveSize = math.clamp(value, 0, 1) -- engine caps at 1; above that it silently clamps
 		elseif key == "waveSpeed" then
 			T.WaterWaveSpeed = math.clamp(value, 0, 100)
 		elseif key == "reflectance" then
@@ -252,6 +203,166 @@ tools.readSea = {
 		}, "\n")
 	end,
 }
+
+-- ---------------------------------------------------------------------------
+-- Sea state: visuals AND wave field together
+-- ---------------------------------------------------------------------------
+--[[
+	These replace the earlier setSeaState/blendSeaStates, which only moved the VISUALS. Switching the look
+	without switching the field left the boat riding a sea nobody could see - the exact failure this whole
+	feature exists to prevent. One button now moves both.
+]]
+
+local function waveField(): any
+	local mod = ReplicatedStorage:FindFirstChild("WaveField")
+	if not mod then return nil end
+	local ok, m = pcall(require, mod)
+	return ok and m or nil
+end
+
+local function waveDebug(): any
+	local mod = ReplicatedStorage:FindFirstChild("WaveFieldDebug")
+	if not mod then return nil end
+	local ok, m = pcall(require, mod)
+	return ok and m or nil
+end
+
+--- Apply a state to everything: water, fog, ambient, and the physical field.
+local function applyFull(state: any, blendSeconds: number): string
+	local SeaStates = seaStates()
+	SeaStates.apply(state)
+	local WF = waveField()
+	if WF then
+		WF.setState(state, blendSeconds)
+		return ("%s  (look + wave field, blending %.0fs)"):format(state.name, blendSeconds)
+	end
+	return ("%s  (look only - WaveField module not found)"):format(state.name)
+end
+
+if hasSea then
+
+tools.seaState = {
+	id = "seaState",
+	label = "Sea state",
+	section = "Sea",
+	scope = "global",
+	controls = { kind = "choice", options = { "DeadCalm", "LightSwell", "Choppy", "Storm", "TheWall" } },
+	run = function(_player: Player, args: any)
+		local SeaStates = seaStates()
+		if not SeaStates then return false, "SeaStates not found" end
+		local state = SeaStates.get(args and args.value)
+		if not state then return false, ("unknown sea state %q"):format(tostring(args and args.value)) end
+		-- 4s blend: fast enough to judge, slow enough that nothing floating is thrown
+		return true, "applied " .. applyFull(state, 4)
+	end,
+}
+
+tools.seaStateInstant = {
+	id = "seaStateInstant",
+	label = "Sea state (snap, no blend)",
+	section = "Sea",
+	scope = "global",
+	controls = { kind = "choice", options = { "DeadCalm", "LightSwell", "Choppy", "Storm", "TheWall" } },
+	run = function(_player: Player, args: any)
+		local SeaStates = seaStates()
+		if not SeaStates then return false, "SeaStates not found" end
+		local state = SeaStates.get(args and args.value)
+		if not state then return false, "unknown sea state" end
+		return true, "snapped to " .. applyFull(state, 0)
+	end,
+}
+
+--[[
+	Cycle every state in order, dwelling on each.
+
+	This is the review tool: one press and the whole range plays out, calm through to The Wall, so the set
+	can be judged as a progression rather than five disconnected screenshots.
+]]
+local cycleToken = 0
+tools.cycleSeaStates = {
+	id = "cycleSeaStates",
+	label = "Cycle all states",
+	section = "Sea",
+	scope = "global",
+	controls = { kind = "choice", options = { "6s each", "12s each", "stop" } },
+	run = function(_player: Player, args: any)
+		local SeaStates = seaStates()
+		if not SeaStates then return false, "SeaStates not found" end
+		local choice = tostring(args and args.value)
+		cycleToken += 1
+		if choice == "stop" then
+			return true, "cycle stopped"
+		end
+		local dwell = choice == "12s each" and 12 or 6
+		local myToken = cycleToken
+		task.spawn(function()
+			for _, id in ipairs(SeaStates.Order) do
+				if cycleToken ~= myToken then return end -- superseded by a newer press
+				applyFull(SeaStates.get(id), math.min(dwell * 0.4, 4))
+				task.wait(dwell)
+			end
+		end)
+		return true, ("cycling all 5 states, %ds each (~%ds total)"):format(dwell, dwell * 5)
+	end,
+}
+
+tools.waveGrid = {
+	id = "waveGrid",
+	label = "Wave field markers",
+	section = "Sea",
+	scope = "global",
+	controls = { kind = "choice", options = { "show", "show wide", "hide" } },
+	run = function(_player: Player, args: any)
+		local D = waveDebug()
+		if not D then return false, "WaveFieldDebug module not found" end
+		local choice = tostring(args and args.value)
+		if choice == "hide" then
+			D.hideGrid()
+			return true, "wave markers hidden"
+		end
+		local n = choice == "show wide" and 22 or 14
+		local spacing = choice == "show wide" and 16 or 10
+		local made = D.showGrid(n, spacing, Vector3.zero)
+		return true, ("%d markers over %d studs - they ride OUR field, not the render"):format(made, n * spacing)
+	end,
+}
+
+tools.waveRuler = {
+	id = "waveRuler",
+	label = "Height ruler",
+	section = "Sea",
+	scope = "global",
+	controls = { kind = "choice", options = { "+/-3 studs", "+/-10 studs", "hide" } },
+	run = function(_player: Player, args: any)
+		local D = waveDebug()
+		if not D then return false, "WaveFieldDebug module not found" end
+		local choice = tostring(args and args.value)
+		if choice == "hide" then
+			D.hideRuler()
+			return true, "ruler hidden"
+		end
+		local span = choice == "+/-10 studs" and 10 or 3
+		local made = D.showRuler(Vector3.zero, -span, span, span > 5 and 0.5 or 0.25)
+		return true, ("%d rungs, +/-%d studs. Red = 0, labels every whole stud"):format(made, span)
+	end,
+}
+
+tools.seaReport = {
+	id = "seaReport",
+	label = "What sea am I looking at?",
+	section = "Sea",
+	scope = "local",
+	controls = { kind = "button", output = "text" },
+	run = function(_player: Player, _args: any)
+		local D = waveDebug()
+		local WF = waveField()
+		if not D or not WF then return false, "wave modules not found" end
+		local blend = WF.blendProgress()
+		return true, D.report() .. (blend and ("\nblending... %.0f%%"):format(blend * 100) or "\nsettled")
+	end,
+}
+
+end -- if hasSea
 
 -- ---------------------------------------------------------------------------
 -- Atmosphere: the real colour lever
@@ -375,6 +486,58 @@ tools.atmosphereDecay = paletteTool("atmosphereDecay", "Atmosphere decay", funct
 		(atm :: any).Decay = c
 	end
 end)
+
+--[[
+	Spawn on demand.
+
+	The game place runs with CharacterAutoLoads = false on purpose: the expedition owns death, and nothing
+	may respawn behind the run's back. The side effect is that pressing Play gives you no body at all, no
+	camera subject, and an apparently dead session.
+
+	This is the deliberate opt-in. It does not change the setting - it asks for a character explicitly,
+	which is exactly the contract the rule describes.
+]]
+tools.spawnMe = {
+	id = "spawnMe",
+	label = "Spawn me a character",
+	section = "Diagnostics",
+	scope = "local",
+	controls = { kind = "button", output = "text" },
+	run = function(player: Player, _args: any)
+		local Players = game:GetService("Players")
+		local ok, err = pcall(function()
+			player:LoadCharacter()
+		end)
+		if not ok then
+			return false, "LoadCharacter failed: " .. tostring(err)
+		end
+
+		-- Put them somewhere standable rather than in the water.
+		local deck = workspace:FindFirstChild("GB_ObservationDeck")
+		local char = player.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		if root and deck and deck:IsA("BasePart") then
+			(root :: BasePart).CFrame = CFrame.new(deck.Position + Vector3.new(0, deck.Size.Y / 2 + 4, 0))
+			return true, ("spawned on %s (autoload stays off - this was an explicit request)"):format(deck.Name)
+		end
+		return true, "spawned. No observation deck found, so you may be swimming."
+	end,
+}
+
+tools.despawnMe = {
+	id = "despawnMe",
+	label = "Remove my character",
+	section = "Diagnostics",
+	scope = "local",
+	controls = { kind = "button" },
+	run = function(player: Player, _args: any)
+		if player.Character then
+			player.Character:Destroy()
+			return true, "character removed (autoload is off, so nothing will bring it back)"
+		end
+		return true, "you had no character"
+	end,
+}
 
 tools.placeInfo = {
 	id = "placeInfo",

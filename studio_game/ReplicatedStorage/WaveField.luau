@@ -72,35 +72,56 @@ do
 	end
 end
 
--- The state the field currently describes. Set by the sea/storm system; defaults to the cruising sea.
-local activeState: any = SeaStates.LightSwell
-
 --[[
-	Blending.
+	STATE LIVES ON THE WORKSPACE, NOT IN THIS MODULE.
 
-	A state change must not step the surface height - a floating object would be launched or submerged.
-	So a change starts a blend and `HeightAt` interpolates through it. The sea *arrives*.
+	Each context (server, and every client) gets its own copy of this module with its own upvalues, so a
+	`local activeState` here would mean the server and the clients each believing in a different sea -
+	which quietly destroys the determinism this module exists to provide. The boat would climb one swell
+	while the spray drew another.
+
+	So the active state is a set of Workspace attributes: the server writes them, everyone reads them.
+	Cheap (an attribute read is fast, and we do at most a dozen a frame), automatically replicated, and
+	survives a client joining midway through a blend.
 ]]
-local blendFrom: any = nil
-local blendStartedAt = 0
-local blendDuration = 0
+local ATTR_STATE = "SeaState"
+local ATTR_BLEND_FROM = "SeaBlendFrom"
+local ATTR_BLEND_AT = "SeaBlendStartedAt"
+local ATTR_BLEND_DUR = "SeaBlendDuration"
+
+local DEFAULT_STATE = "LightSwell"
 
 local function now(): number
 	-- Synchronised across server and all clients. This is the whole determinism story.
 	return workspace:GetServerTimeNow()
 end
 
+local function stateByName(name: any): any
+	if typeof(name) ~= "string" then
+		return nil
+	end
+	return SeaStates.get(name)
+end
+
+--- The state the field currently describes, read from the shared attributes.
+function WaveField.getState(): any
+	return stateByName(workspace:GetAttribute(ATTR_STATE)) or SeaStates[DEFAULT_STATE]
+end
+
 --- Returns the wave spec to sample right now, interpolating if a blend is in flight.
 local function currentWave(): any
-	if not blendFrom or blendDuration <= 0 then
-		return activeState.wave
+	local target = WaveField.getState()
+	local from = stateByName(workspace:GetAttribute(ATTR_BLEND_FROM))
+	local startedAt = workspace:GetAttribute(ATTR_BLEND_AT)
+	local dur = workspace:GetAttribute(ATTR_BLEND_DUR)
+	if not from or typeof(startedAt) ~= "number" or typeof(dur) ~= "number" or dur <= 0 then
+		return target.wave
 	end
-	local t = (now() - blendStartedAt) / blendDuration
-	if t >= 1 then
-		blendFrom = nil
-		return activeState.wave
+	local t = (now() - startedAt) / dur
+	if t >= 1 or t < 0 then
+		return target.wave
 	end
-	local a, b = blendFrom.wave, activeState.wave
+	local a, b = from.wave, target.wave
 	local function n(x: number, y: number): number
 		return x + (y - x) * t
 	end
@@ -114,24 +135,43 @@ local function currentWave(): any
 	}
 end
 
---- Switch state, blending over `seconds` so nothing floating gets thrown.
+--[[
+	Switch state, blending over `seconds` so nothing floating gets thrown.
+
+	Writes the shared attributes, so this should be called on the SERVER. Calling it on a client changes
+	only that client's view and will be overwritten by replication - which is the correct outcome for a
+	server-authoritative sea.
+]]
 function WaveField.setState(state: any, seconds: number?)
-	if not state or not state.wave then
+	if not state or not state.wave or not state.id then
 		return
 	end
+	local previous = workspace:GetAttribute(ATTR_STATE)
 	local dur = seconds or 4
-	if dur > 0 and activeState ~= state then
-		blendFrom = activeState
-		blendStartedAt = now()
-		blendDuration = dur
+	if dur > 0 and previous and previous ~= state.id then
+		workspace:SetAttribute(ATTR_BLEND_FROM, previous)
+		workspace:SetAttribute(ATTR_BLEND_AT, now())
+		workspace:SetAttribute(ATTR_BLEND_DUR, dur)
 	else
-		blendFrom = nil
+		workspace:SetAttribute(ATTR_BLEND_FROM, nil)
+		workspace:SetAttribute(ATTR_BLEND_DUR, 0)
 	end
-	activeState = state
+	workspace:SetAttribute(ATTR_STATE, state.id)
 end
 
-function WaveField.getState(): any
-	return activeState
+--- Is a blend in flight, and how far through? Returns nil when settled.
+function WaveField.blendProgress(): number?
+	local from = workspace:GetAttribute(ATTR_BLEND_FROM)
+	local startedAt = workspace:GetAttribute(ATTR_BLEND_AT)
+	local dur = workspace:GetAttribute(ATTR_BLEND_DUR)
+	if not from or typeof(startedAt) ~= "number" or typeof(dur) ~= "number" or dur <= 0 then
+		return nil
+	end
+	local t = (now() - startedAt) / dur
+	if t >= 1 or t < 0 then
+		return nil
+	end
+	return t
 end
 
 --[[
