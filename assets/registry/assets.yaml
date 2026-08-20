@@ -62,18 +62,22 @@ assets:
   place_notes: Performs tasks in game; shown in the lobby crew roster.
   feature: GAME-0009
   notes: Needs repair, carry, idle, walk/run and interaction animations.
-- id: ASSET-SKY-OVERCAST
+- id: ASSET-SKY-SET
   type: skybox
-  status: IDEA
+  status: IMPLEMENTED
   source: store
-  roblox_path: Lighting.Sky
+  roblox_path: ReplicatedStorage.SkyLibrary
   place: game
-  place_notes: Blocks the cold-ocean look; see docs/build/01-sea.md finding 1.
   feature: GAME-0011
-  notes: Overcast/storm skybox set. PROVEN BLOCKER - job 007 established that neither Fog nor
-    Atmosphere can make Roblox's clear-day sky overcast, so the art direction cannot be reached
-    without this. Need at least 3 (overcast day, storm, night); ideally one per sea stage (7).
-    The default tropical Sky is parked in ServerStorage as Sky_DefaultTropical_PARKED.
+  notes: Seven free Creator Store skyboxes, sourced and vetted in job 015, stored as DATA in
+    SkyLibrary.luau (six face ids each) rather than as instances, so the set is version-controlled.
+    All seven scanned in an isolated quarantine before use - zero scripts found. Mapped per sea state:
+    SunlessBlue=DeadCalm, SnowGrey=LightSwell, FogOnWater=Choppy, AngryHeavens=Storm, BlackVoid=TheWall,
+    plus NightFog for the day/night cycle and ClassicRoblox as a fallback. THIRD-PARTY: free Creator
+    Store licence is Roblox-only use; we do not own these. Full provenance and scan results in the
+    shared registry at roblox.workspace/Assets/registry/models.md. STILL MISSING a true flat-grey
+    overcast - SnowGrey is the nearest free borrow; commission six faces to the palette if the calm
+    states still read wrong.
 - id: ASSET-SEABED-SAND
   type: terrain
   status: IMPLEMENTED

@@ -1,7 +1,7 @@
 # FINDING 0006: Cold-ocean palette is blocked on overcast sky assets
 
 **Project:** `roblox.tide`
-**Status:** open
+**Status:** fixed (2026-08-20) — RESOLVED in job 015. Seven free Creator Store skyboxes sourced, all scanned clean (zero LuaSourceContainers) in an isolated quarantine before anything ran, and stored as DATA in ReplicatedStorage/SkyLibrary.luau rather than as instances so the set is version-controlled. Each sea state now names its own sky, so switching a state moves water, air AND sky together: SunlessBlue for Dead Calm, SnowGrey for Light Swell, FogOnWater for Choppy, AngryHeavens for Storm, BlackVoid for The Wall. Verified per state, and lerp carries skyId with the dominant half (a sky has six ContentIds and cannot cross-fade, so it snaps while fog and atmosphere blend around it, which hides the cut). PARTIAL CAVEAT: a true flat-grey overcast does not exist free in the store - SnowGrey is a snow sky borrowed for the purpose, and it is the nearest available. If the calm states still read wrong to the eye, the remaining answer is commissioning six faces to the palette, which is now a much smaller gap than the original blocker. Also fixed while here: SunlessBlue and ClassicRoblox shipped CelestialBodiesShown=true, and a visible sun disc is most of what made the default sky read as a holiday, so the library forces it false on every sky except the deliberate fallback.
 **Severity:** med
 **Created:** 2026-08-20 00:01:35
 

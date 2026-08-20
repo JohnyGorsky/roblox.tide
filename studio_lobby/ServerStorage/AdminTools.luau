@@ -497,6 +497,62 @@ end)
 	This is the deliberate opt-in. It does not change the setting - it asks for a character explicitly,
 	which is exactly the contract the rule describes.
 ]]
+--[[
+	Sky override.
+
+	Each sea state names its own sky now, so this is for judging one against another without changing the
+	state - e.g. seeing whether Snow Grey or Fog on Water suits Choppy better. Switching state afterwards
+	will overwrite it, which is correct: the state owns the sky.
+]]
+tools.setSky = {
+	id = "setSky",
+	label = "Sky (override)",
+	section = "Sea",
+	scope = "global",
+	controls = {
+		kind = "choice",
+		options = {
+			"SunlessBlue", "SnowGrey", "FogOnWater", "AngryHeavens",
+			"BlackVoid", "NightFog", "ClassicRoblox", "none (procedural)",
+		},
+	},
+	run = function(_player: Player, args: any)
+		local mod = ReplicatedStorage:FindFirstChild("SkyLibrary")
+		if not mod then
+			return false, "SkyLibrary not found in ReplicatedStorage"
+		end
+		local okReq, SkyLibrary = pcall(require, mod)
+		if not okReq then
+			return false, "SkyLibrary failed to load"
+		end
+		local choice = tostring(args and args.value)
+		if choice == "none (procedural)" then
+			return SkyLibrary.apply(nil)
+		end
+		return SkyLibrary.apply(choice)
+	end,
+}
+
+tools.whichSky = {
+	id = "whichSky",
+	label = "Which sky is applied?",
+	section = "Diagnostics",
+	scope = "local",
+	controls = { kind = "button", output = "text" },
+	run = function(_player: Player, _args: any)
+		local mod = ReplicatedStorage:FindFirstChild("SkyLibrary")
+		if not mod then return false, "SkyLibrary not found" end
+		local okReq, SkyLibrary = pcall(require, mod)
+		if not okReq then return false, "SkyLibrary failed to load" end
+		local id = SkyLibrary.current()
+		if not id then
+			return true, "no library sky applied (procedural gradient, or a hand-placed Sky)"
+		end
+		local d = SkyLibrary.get(id)
+		return true, ("%s\n%s\n%s"):format(d.label, d.intent, d.source)
+	end,
+}
+
 tools.spawnMe = {
 	id = "spawnMe",
 	label = "Spawn me a character",

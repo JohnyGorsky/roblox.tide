@@ -18,6 +18,8 @@
 	These numbers are a starting point for judging by eye, not final balance.
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local SeaStates = {}
 
 export type WaveSpec = {
@@ -78,6 +80,12 @@ export type SeaState = {
 	description: string,
 	water: WaterSpec,
 	sky: SkySpec,
+	--[[
+		Which sky from SkyLibrary. This is the last piece of the colour problem: job 007 proved the sky
+		dominates how the sea reads and that no amount of fog or atmosphere can overcast a clear-day sky,
+		so a state that does not name its own sky can never fully change the sea's mood.
+	]]
+	skyId: string,
 	atmosphere: AtmosphereSpec,
 	wave: WaveSpec,
 	spray: number, -- 0..1 drives whitecap/spray density in the VFX layer
@@ -132,6 +140,7 @@ SeaStates.DeadCalm = {
 		color = Color3.fromRGB(150, 165, 175), -- pale, clean air: you can see for miles, which is the problem
 		decay = Color3.fromRGB(86, 100, 112),
 	},
+	skyId = "SunlessBlue", -- cold and clear, no sun disc - the calm that feels wrong
 	wave = { amplitude = 0.15, length = 90, speed = 4, choppiness = 0.0, directionSpread = 0.1, directionDeg = 0 },
 	spray = 0.0,
 	audioBed = "sea_dead_calm",
@@ -161,6 +170,7 @@ SeaStates.LightSwell = {
 		color = Color3.fromRGB(132, 145, 154),
 		decay = Color3.fromRGB(58, 68, 80),
 	},
+	skyId = "SnowGrey", -- flat grey overcast: the working sea
 	wave = { amplitude = 0.8, length = 70, speed = 11, choppiness = 0.2, directionSpread = 0.2, directionDeg = 8 },
 	spray = 0.1,
 	audioBed = "sea_light_swell",
@@ -190,6 +200,7 @@ SeaStates.Choppy = {
 		color = Color3.fromRGB(120, 132, 141),
 		decay = Color3.fromRGB(58, 68, 80),
 	},
+	skyId = "FogOnWater", -- weather closing in
 	wave = { amplitude = 2.0, length = 55, speed = 15, choppiness = 0.5, directionSpread = 0.4, directionDeg = 15 },
 	spray = 0.35,
 	audioBed = "sea_choppy",
@@ -219,6 +230,7 @@ SeaStates.Storm = {
 		color = Color3.fromRGB(86, 96, 105),
 		decay = Color3.fromRGB(30, 36, 44),
 	},
+	skyId = "AngryHeavens", -- dark storm cloud
 	wave = { amplitude = 4.5, length = 45, speed = 20, choppiness = 0.8, directionSpread = 0.6, directionDeg = 22 },
 	spray = 0.75,
 	audioBed = "sea_storm",
@@ -245,7 +257,7 @@ SeaStates.TheWall = {
 	sky = {
 		fogStart = 10,
 		fogEnd = 330, -- you cannot see the bow of a large vessel
-		fogColor = Color3.fromRGB(26, 30, 36),
+		fogColor = Color3.fromRGB(6, 7, 9), -- matched to BlackVoid: no seam between fog and sky
 		outdoorAmbient = 0.35,
 		brightness = 1.0,
 	},
@@ -254,6 +266,18 @@ SeaStates.TheWall = {
 		color = Color3.fromRGB(70, 78, 88),
 		decay = Color3.fromRGB(24, 29, 36),
 	},
+	--[[
+		BlackVoid is a DELIBERATE choice, kept after review (2026-08-20).
+
+		The alternative was reusing AngryHeavens so The Wall read as Storm intensified - textured cloud,
+		with fog doing the blinding. Rejected: The Wall should feel like the world has stopped existing,
+		not like bad weather. Do not "fix" this to a cloud sky without asking.
+
+		The risk it carries is a flat black ceiling above dark water, which can read as a rendering
+		failure. The mitigation is below: fogColor is matched to the void so there is no seam between
+		fog and sky - enveloping rather than a lid.
+	]]
+		skyId = "BlackVoid",
 	wave = { amplitude = 7.5, length = 38, speed = 26, choppiness = 1.0, directionSpread = 0.9, directionDeg = 30 },
 	spray = 1.0,
 	audioBed = "sea_the_wall",
@@ -313,11 +337,14 @@ function SeaStates.lerp(a: SeaState, b: SeaState, t: number): SeaState
 	local function c(x: Color3, y: Color3): Color3
 		return x:Lerp(y, t)
 	end
+	-- A sky cannot be cross-faded (six ContentIds, no blend), so it snaps with the dominant half. The
+	-- fog and atmosphere blend around it, which hides the cut surprisingly well.
 	local dominant = if t < 0.5 then a else b
 	return {
 		id = dominant.id,
 		name = dominant.name,
 		description = dominant.description,
+		skyId = dominant.skyId,
 		water = {
 			color = c(a.water.color, b.water.color),
 			reflectance = n(a.water.reflectance, b.water.reflectance),
@@ -381,6 +408,15 @@ function SeaStates.apply(state: SeaState)
 		math.clamp(a.G * m, 0, 1),
 		math.clamp(a.B * m, 0, 1)
 	)
+
+	-- The sky. Dominant term in the sea's apparent colour (job 007), so it moves with the state.
+	local skyMod = ReplicatedStorage:FindFirstChild("SkyLibrary")
+	if skyMod and state.skyId then
+		local okSky, SkyLibrary = pcall(require, skyMod)
+		if okSky then
+			SkyLibrary.apply(state.skyId)
+		end
+	end
 
 	-- The air. This is what actually makes the states look different from each other.
 	local atm = Lighting:FindFirstChildOfClass("Atmosphere")

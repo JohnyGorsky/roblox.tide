@@ -106,8 +106,8 @@ Groups are sized to be taken one at a time. See [docs/build/README.md](docs/buil
 | Status | Count |
 |---|---|
 | GRAYBOX | 2 |
-| IDEA | 8 |
-| IMPLEMENTED | 2 |
+| IDEA | 7 |
+| IMPLEMENTED | 3 |
 
 ### Graybox placeholders awaiting real art
 
@@ -135,6 +135,7 @@ that exist in Studio but were never registered.
 - [x] **012** Wave field: HeightAt / NormalAt for the sea surface
 - [x] **013** Admin panel: atmosphere and palette colour controls
 - [x] **014** Make the game place enterable for a dev: spawn-on-demand and an observation deck
+- [x] **015** Source and vet overcast/storm skies
 
 An unchecked job is still in flight.
 
