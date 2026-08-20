@@ -196,8 +196,19 @@ local function maybeGust(wind: number)
 	if wind < 0.12 or os.clock() < nextGustAt then
 		return
 	end
+	-- Timer advances FIRST, before the solo check. Otherwise a muted gust never reschedules and one fires
+	-- the instant solo is lifted, which reads as the panel making a noise.
 	local gap = GUST_MAX_GAP - (GUST_MAX_GAP - GUST_MIN_GAP) * wind
 	nextGustAt = os.clock() + gap * (0.6 + math.random() * 0.8)
+
+	--[[
+		Gusts are one-shots and never pass through a bed, so solo has to be checked here by hand. A gust
+		belongs to whichever wind layer spawned it.
+	]]
+	local layer = if wind > 0.4 then "windHigh" else "windLow"
+	if not AudioBed.audible(layer) then
+		return
+	end
 
 	local slot = if wind > 0.4 then SLOTS.windHigh else SLOTS.windLow
 	if slot.id == "" then
@@ -277,6 +288,10 @@ function StormAudio.thunder(distance: number, magnitude: number)
 	if slot.id == "" then
 		return false
 	end
+	-- one-shot, so solo is checked here rather than inside a bed's step
+	if not AudioBed.audible("thunder") then
+		return false
+	end
 	local s = Instance.new("Sound")
 	s.Name = "Storm_thunder_once"
 	s.SoundId = "rbxassetid://" .. slot.id
@@ -341,6 +356,10 @@ function StormAudio.report(): string
 	end
 	table.insert(lines, "")
 	table.insert(lines, ("%d live voices   next gust in %.1fs"):format(voices, math.max(0, nextGustAt - os.clock())))
+	local solo = AudioBed.solo()
+	if solo then
+		table.insert(lines, ("🔇 SOLO: %s - every other channel is muted"):format(solo))
+	end
 	local missing = StormAudio.missing()
 	table.insert(lines, ("missing: %s"):format(#missing > 0 and table.concat(missing, ", ") or "nothing"))
 	return table.concat(lines, "\n")

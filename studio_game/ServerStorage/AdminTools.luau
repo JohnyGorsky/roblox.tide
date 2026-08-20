@@ -756,8 +756,57 @@ tools.lightningStrike = {
 }
 
 --[[
-	AUDIO. `scope = "local"` throughout - sound is a client thing, and a server-side audio report would
-	truthfully say nothing is playing.
+	TIME OF DAY.
+
+	`DayNight.jumpTo` has existed since job 016 and was exposed nowhere, so changing the hour meant waiting up
+	to 9.5 minutes for a phase to come round. That blocked judging the night look at all - not just whether
+	the gulls go quiet.
+
+	Server-side, correctly: the clock lives in Workspace attributes and everyone must agree what time it is.
+]]
+tools.timeOfDay = {
+	id = "timeOfDay",
+	label = "Time of day",
+	section = "Sea",
+	scope = "global",
+	controls = {
+		kind = "choice",
+		options = { "Dawn", "Day", "Dusk", "Night", "pause", "resume" },
+	},
+	run = function(_player: Player, args: any)
+		local mod = ReplicatedStorage:FindFirstChild("DayNight")
+		if not mod then return false, "DayNight not found" end
+		local ok, DN = pcall(require, mod)
+		if not ok then return false, "DayNight failed to load: " .. tostring(DN) end
+		local value = tostring(args and args.value)
+		if value == "pause" then
+			DN.pause()
+			return true, "clock paused. The composer still runs, so the look keeps updating."
+		elseif value == "resume" then
+			DN.resume()
+			return true, "clock resumed"
+		end
+		DN.jumpTo(value)
+		--[[
+			Compose immediately. The world tick would do it within a second anyway, but a control that
+			appears to do nothing for a beat reads as broken.
+		]]
+		pcall(DN.compose)
+		local phase, progress = DN.currentPhase()
+		return true, ("jumped to %s (%.0f%% through)\n%s"):format(phase, progress * 100, DN.report())
+	end,
+}
+
+--[[
+	AUDIO.
+
+	🔴 THESE RUN ON THE CLIENT. See the note in AdminClient's `CLIENT_HANDLERS`.
+
+	`scope = "local"` was only ever metadata about what a tool AFFECTS - every handler here is invoked by
+	AdminServer, i.e. on the server, where the audio beds and VFX rigs have never been started. So these
+	readouts truthfully reported nothing running. AdminClient now intercepts them by id and runs them locally,
+	where the state actually lives. The definitions stay here so the panel's labels and options still come
+	from the server.
 ]]
 local function stormAudio()
 	local m = ReplicatedStorage:FindFirstChild("StormAudio")
@@ -809,6 +858,29 @@ tools.audioReport = {
 	Nothing here writes the id to disk - a keeper still gets written into StormAudio and logged in the shared
 	registry by hand, which is the step that records the licence.
 ]]
+--[[
+	SOLO one audio channel.
+
+	Nine beds play at once, and picking one out by ear is genuinely hard - `deadCalm` is deliberately
+	near-subsonic and `birds` peaks at 0.22. Runs on the CLIENT: `AudioBed.setSolo` is a module-level setting,
+	and the server's copy of that module is not the one making any noise.
+]]
+tools.audioSolo = {
+	id = "audioSolo",
+	label = "Solo one channel",
+	section = "Audio",
+	scope = "local",
+	controls = {
+		kind = "choice",
+		options = { "off (mix)", "oceanCalm", "oceanHeavy", "deadCalm", "birds", "stormBed",
+			"windLow", "windHigh", "rain", "thunder" },
+	},
+	run = function(_player: Player, _args: any)
+		-- never reached: AdminClient intercepts this id. Kept so the manifest carries label and options.
+		return false, "this tool runs on the client"
+	end,
+}
+
 tools.audioAudition = {
 	id = "audioAudition",
 	label = "Audition a sound id",
@@ -1053,11 +1125,28 @@ function AdminTools.manifest(): { any }
 			controls = tool.controls,
 		})
 	end
+	--[[
+		Sections in a DELIBERATE order, not alphabetically.
+
+		Alphabetical put Audio first and Sea in the middle, which is meaningless to anyone using the panel.
+		This orders by how often a section is actually reached for while working: the storm and the weather
+		are what gets driven, the sea is set less often, audio is being tuned right now, and Diagnostics is
+		where you go when something is wrong rather than as a matter of course.
+
+		A section not listed here falls to the end alphabetically, so adding one never breaks the sort - it
+		just does not get a considered position until someone gives it one.
+	]]
+	local SECTION_ORDER = { Storm = 1, Weather = 2, Sea = 3, Audio = 4, Diagnostics = 5 }
 	table.sort(list, function(a, b)
 		if a.section == b.section then
 			return a.label < b.label
 		end
-		return a.section < b.section
+		local ra = SECTION_ORDER[a.section] or 99
+		local rb = SECTION_ORDER[b.section] or 99
+		if ra == rb then
+			return a.section < b.section
+		end
+		return ra < rb
 	end)
 	return list
 end

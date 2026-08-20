@@ -231,7 +231,148 @@ end
 -- Calling the server
 -- ---------------------------------------------------------------------------
 
+--[[
+	🔴 TOOLS THAT MUST RUN ON THE CLIENT.
+
+	This exists because of a bug worth spelling out. `AdminServer` invokes every `tool.run` itself, so
+	`scope = "local"` was only ever metadata about what a tool AFFECTS - it never controlled where the handler
+	EXECUTES. Everything ran on the server.
+
+	For most tools that is correct: the sea state, the clock and the storm all live in Workspace attributes and
+	everyone must agree on them. But the audio beds and the weather VFX rigs are built by THIS script, on the
+	client, and exist nowhere else. So a server-side handler inspecting them found no beds and no rigs, and
+	truthfully reported nothing running - a readout that was confidently, silently wrong.
+
+	It went unnoticed because the automated checks ran in a single Studio context which had started those
+	modules itself, so the state the handler looked for happened to be there.
+
+	These handlers run locally instead. The tool DEFINITIONS stay in ServerStorage so the panel's labels and
+	options still come from the server, and every tool that changes the world still goes through the server's
+	authorisation - that boundary is untouched. Only read-only diagnostics and client-local audio moved.
+]]
+local function requireShared(name: string)
+	local m = ReplicatedStorage:FindFirstChild(name)
+	if not m then
+		return nil, name .. " not found"
+	end
+	local ok, mod = pcall(require, m)
+	if not ok then
+		return nil, name .. " failed to load: " .. tostring(mod)
+	end
+	return mod, nil
+end
+
+local CLIENT_HANDLERS: { [string]: (any) -> (boolean, string) } = {
+	--- Is the client half of the weather actually running? The question job 017's dead VFX made necessary.
+	vfxReport = function(_args)
+		local lines = {}
+		for _, name in ipairs({ "StormVFX", "CloudWallVFX", "LightningVFX" }) do
+			local mod, err = requireShared(name)
+			table.insert(lines, "-- " .. name .. " --")
+			table.insert(lines, mod and mod.report() or tostring(err))
+			table.insert(lines, "")
+		end
+		return true, table.concat(lines, "\n")
+	end,
+
+	audioReport = function(_args)
+		local lines = {}
+		local SA, saErr = requireShared("StormAudio")
+		table.insert(lines, "===== STORM (wind / rain / thunder) =====")
+		table.insert(lines, SA and SA.report() or tostring(saErr))
+		table.insert(lines, "")
+		local Amb, ambErr = requireShared("Ambience")
+		table.insert(lines, "===== AMBIENCE (ocean / birds / storm bed) =====")
+		table.insert(lines, Amb and Amb.report() or tostring(ambErr))
+		return true, table.concat(lines, "\n")
+	end,
+
+	--[[
+		What normally drives each channel.
+
+		Included because the first version of solo just went quiet and the control looked broken. Six of the
+		nine channels are legitimately silent at default conditions, so a tester needs to be told what would
+		bring one in - otherwise "solo deadCalm" and "solo a channel that is broken" look identical.
+	]]
+	audioSolo = (function()
+		local DRIVEN_BY = {
+			oceanCalm = "calm seas - loudest at low severity, fades as the sea worsens",
+			oceanHeavy = "sea severity above ~0.2. Sea -> Sea state -> Choppy or Storm",
+			deadCalm = "severity below 0.15 only. Sea -> Sea state -> DeadCalm",
+			birds = "daylight AND calm AND no storm. Sea -> Time of day -> Day",
+			stormBed = "storm intensity 1+. Storm -> Storm distance -> 2.5 km or nearer",
+			windLow = "Wind, thinning above 0.35. Weather -> Pin today's weather -> Slight/Moderate",
+			windHigh = "Wind above 0.35 only. Weather -> Pin today's weather -> Fresh or Rough",
+			rain = "Precipitation. Weather -> Pin -> Rough, or close the storm in",
+			thunder = "NOTHING - it is a one-shot, fired only by a lightning strike",
+		}
+		return function(args)
+			local Bed, err = requireShared("AudioBed")
+			if not Bed then
+				return false, tostring(err)
+			end
+			local value = tostring(args and args.value or "")
+			if value == "" or value:find("off") then
+				Bed.setSolo(nil)
+				return true, "solo off - normal mix restored"
+			end
+			Bed.setSolo(value)
+
+			--[[
+				Thunder is a one-shot and has no bed, so solo cannot force it up - there is nothing playing to
+				force. Fire one instead, which is what the tester actually wanted.
+			]]
+			if value == "thunder" then
+				local SA = requireShared("StormAudio")
+				if SA then
+					SA.thunder(500, 0.9)
+					return true, "SOLO: thunder\nFired one strike at 500 studs. It is a ONE-SHOT, so there is nothing to sustain - click again to hear it, or Storm -> Force a lightning strike to hear it in context."
+				end
+			end
+
+			return true, ("SOLO: %s\nForced to full so you can hear it, and everything else muted.\nNormally driven by: %s"):format(
+				value, DRIVEN_BY[value] or "unknown")
+		end
+	end)(),
+
+	audioAudition = function(args)
+		local SA, err = requireShared("StormAudio")
+		if not SA then
+			return false, tostring(err)
+		end
+		local raw = tostring(args and args.value or "")
+		local slot, id = raw:match("^%s*(%a+)%s*=%s*(.+)%s*$")
+		if not slot then
+			return false, "expected  slot=id  - slots are: windLow, windHigh, rain, thunder"
+		end
+		local ok, msg = SA.setId(slot, id)
+		if not ok then
+			return false, msg
+		end
+		if slot == "thunder" then
+			SA.thunder(600, 0.9)
+			return true, msg .. "\nplayed once at 600 studs. Force a strike to hear it in context."
+		end
+		return true, msg .. "\nlooping now - move the wind to hear it level."
+	end,
+}
+
 local function call(action: string, args: any?)
+	--[[
+		Client-side tools never reach the network. They inspect or change state that only exists here, so
+		there is nothing for the server to answer.
+	]]
+	local handler = CLIENT_HANDLERS[action]
+	if handler then
+		local okRun, okResult, text = pcall(handler, args)
+		if not okRun then
+			say("client tool error: " .. tostring(okResult), DANGER)
+			return nil
+		end
+		say(tostring(text), okResult and RADAR or AMBER)
+		return { ok = okResult, result = text }
+	end
+
 	local ok, res = pcall(function()
 		return (remote :: RemoteFunction):InvokeServer(action, args)
 	end)
@@ -265,22 +406,84 @@ local function nextOrder(): number
 	return order
 end
 
+--[[
+	COLLAPSIBLE SECTIONS.
+
+	The panel reached 33 tools in one flat scrolling list and became a wall - you scrolled past four sections
+	to reach the one you wanted, and the sheer length made it read as complicated rather than capable.
+
+	Each header is now a button that toggles its own container, and everything starts COLLAPSED except the
+	section named in `OPEN_BY_DEFAULT`. So the panel opens as a short list of headers you can read at a glance.
+
+	`currentParent` is what makes this a small change: the build helpers below parent into it rather than into
+	`body`, so adding a tool needs no knowledge of sections at all.
+]]
+local currentParent: Instance = body
+local sectionCount = 0
+
+--[[
+	The FIRST section is open on arrival; everything else starts collapsed.
+
+	Keyed off position rather than a section name on purpose - the server decides the order (see
+	SECTION_ORDER in AdminTools), so naming a section here would let the two drift apart and quietly leave
+	the panel opening on whatever happened to be called that.
+]]
+
 local function section(name: string)
-	local holder = Instance.new("Frame")
-	holder.BackgroundTransparency = 1
-	holder.Size = UDim2.new(1, 0, 0, 22)
-	holder.LayoutOrder = nextOrder()
-	holder.Parent = body
-	local t = label(holder, name:upper(), 11, MUTED)
-	t.Size = UDim2.new(1, 0, 1, 0)
-	local line = Instance.new("Frame")
-	line.AnchorPoint = Vector2.new(0, 1)
-	line.Position = UDim2.new(0, 0, 1, 0)
-	line.Size = UDim2.new(1, 0, 0, 1)
-	line.BackgroundColor3 = LINE
-	line.BorderSizePixel = 0
-	line.Parent = holder
+	sectionCount += 1
+
+	local header = Instance.new("TextButton")
+	header.Size = UDim2.new(1, 0, 0, 30)
+	header.BackgroundColor3 = Color3.fromRGB(24, 43, 58)
+	header.BorderSizePixel = 0
+	header.Font = FONT
+	header.TextSize = 12
+	header.TextColor3 = TEXT
+	header.TextXAlignment = Enum.TextXAlignment.Left
+	header.AutoButtonColor = true
+	header.LayoutOrder = nextOrder()
+	header.Parent = body
+	corner(header, 6)
+	stroke(header, LINE)
+
+	local hpad = Instance.new("UIPadding")
+	hpad.PaddingLeft = UDim.new(0, 10)
+	hpad.Parent = header
+
+	-- The container every tool in this section lives in. Collapsing is just hiding this.
+	local container = Instance.new("Frame")
+	container.BackgroundTransparency = 1
+	container.Size = UDim2.new(1, 0, 0, 0)
+	container.AutomaticSize = Enum.AutomaticSize.Y
+	container.LayoutOrder = nextOrder()
+	container.Parent = body
+
+	local inner = Instance.new("UIListLayout")
+	inner.Padding = UDim.new(0, 6)
+	inner.SortOrder = Enum.SortOrder.LayoutOrder
+	inner.Parent = container
+
+	local ipad = Instance.new("UIPadding")
+	ipad.PaddingTop = UDim.new(0, 6)
+	ipad.PaddingBottom = UDim.new(0, 6)
+	ipad.PaddingLeft = UDim.new(0, 6)
+	ipad.Parent = container
+
+	local open = (sectionCount == 1)
+	local function refresh()
+		container.Visible = open
+		-- the caret is the whole affordance; without it a header looks like a label, not a control
+		header.Text = ("%s  %s"):format(open and "▾" or "▸", name:upper())
+	end
+	refresh()
+	header.Activated:Connect(function()
+		open = not open
+		refresh()
+	end)
+
+	currentParent = container
 end
+
 
 local function scopeTag(scope: string): string
 	return scope == "global" and "  ·  all players" or "  ·  you only"
@@ -292,7 +495,7 @@ local function buildChoice(tool: any)
 	holder.AutomaticSize = Enum.AutomaticSize.Y
 	holder.Size = UDim2.new(1, 0, 0, 0)
 	holder.LayoutOrder = nextOrder()
-	holder.Parent = body
+	holder.Parent = currentParent
 
 	local l = Instance.new("UIListLayout")
 	l.Padding = UDim.new(0, 4)
@@ -301,9 +504,50 @@ local function buildChoice(tool: any)
 	local head = label(holder, tool.label .. scopeTag(tool.scope), 12)
 	head.LayoutOrder = 1
 
-	for i, opt in ipairs(tool.controls.options) do
-		local b = button(holder, tostring(opt), 34)
-		b.LayoutOrder = i + 1
+	--[[
+		MANY OPTIONS WRAP INTO TWO COLUMNS.
+
+		A full-width button per option is fine for three or four, and becomes a wall at ten - the audio solo
+		control alone was ten stacked rows, which reintroduced inside one section exactly the crowding the
+		collapsible sections were meant to fix.
+
+		Two columns rather than three: option labels here are words like "oceanHeavy" and "0.15 km THE WALL",
+		and a third column makes them truncate. Tap targets stay >= 34px tall, which the mobile guidance
+		requires, so wrapping costs nothing there.
+	]]
+	local options = tool.controls.options
+	local twoColumn = #options > 5
+
+	if not twoColumn then
+		for i, opt in ipairs(options) do
+			local b = button(holder, tostring(opt), 34)
+			b.LayoutOrder = i + 1
+			b.Activated:Connect(function()
+				call(tool.id, { value = opt })
+			end)
+		end
+		return
+	end
+
+	local grid = Instance.new("Frame")
+	grid.BackgroundTransparency = 1
+	grid.AutomaticSize = Enum.AutomaticSize.Y
+	grid.Size = UDim2.new(1, 0, 0, 0)
+	grid.LayoutOrder = 2
+	grid.Parent = holder
+
+	local flow = Instance.new("UIGridLayout")
+	flow.CellPadding = UDim2.fromOffset(4, 4)
+	-- 0.5 scale minus half the padding, so two cells plus the gap fit the width exactly
+	flow.CellSize = UDim2.new(0.5, -2, 0, 32)
+	flow.SortOrder = Enum.SortOrder.LayoutOrder
+	flow.Parent = grid
+
+	for i, opt in ipairs(options) do
+		local b = button(grid, tostring(opt), 32)
+		b.Size = UDim2.new() -- the grid owns sizing
+		b.TextSize = 12 -- a half-width cell needs a smaller face or the longer labels clip
+		b.LayoutOrder = i
 		b.Activated:Connect(function()
 			call(tool.id, { value = opt })
 		end)
@@ -316,7 +560,7 @@ local function buildSliders(tool: any)
 	holder.AutomaticSize = Enum.AutomaticSize.Y
 	holder.Size = UDim2.new(1, 0, 0, 0)
 	holder.LayoutOrder = nextOrder()
-	holder.Parent = body
+	holder.Parent = currentParent
 
 	local l = Instance.new("UIListLayout")
 	l.Padding = UDim.new(0, 6)
@@ -394,7 +638,7 @@ local function buildBlend(tool: any)
 	holder.AutomaticSize = Enum.AutomaticSize.Y
 	holder.Size = UDim2.new(1, 0, 0, 0)
 	holder.LayoutOrder = nextOrder()
-	holder.Parent = body
+	holder.Parent = currentParent
 
 	local l = Instance.new("UIListLayout")
 	l.Padding = UDim.new(0, 4)
@@ -445,8 +689,67 @@ local function buildBlend(tool: any)
 	end)
 end
 
+--[[
+	A free-text control: a box plus a send button.
+
+	Added for auditioning sound ids (job 018). The point is that a candidate clip cannot be judged from its
+	Creator Store page - it has to be heard under the wind bed at the volume curve the storm gives it - so
+	the id has to be pasteable at runtime rather than compiled in.
+
+	`ClearTextOnFocus = false` deliberately: the usual use is pasting one id, tweaking a digit, and sending
+	again, and clearing on focus makes that infuriating.
+]]
+local function buildText(tool: any)
+	local holder = Instance.new("Frame")
+	holder.Size = UDim2.new(1, 0, 0, 62)
+	holder.BackgroundTransparency = 1
+	holder.LayoutOrder = nextOrder()
+	holder.Parent = currentParent
+
+	local title = label(holder, tool.label .. scopeTag(tool.scope), 13)
+	title.Size = UDim2.new(1, 0, 0, 18)
+
+	local box = Instance.new("TextBox")
+	box.Size = UDim2.new(1, -74, 0, 32)
+	box.Position = UDim2.new(0, 0, 0, 22)
+	box.BackgroundColor3 = Color3.fromRGB(18, 32, 44)
+	box.BorderSizePixel = 0
+	box.Font = FONT
+	box.TextSize = 13
+	box.TextColor3 = TEXT
+	box.PlaceholderText = (tool.controls and tool.controls.placeholder) or ""
+	box.PlaceholderColor3 = Color3.fromRGB(110, 128, 142)
+	box.Text = ""
+	box.ClearTextOnFocus = false
+	box.TextXAlignment = Enum.TextXAlignment.Left
+	box.Parent = holder
+	corner(box, 6)
+	stroke(box, LINE)
+
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, 8)
+	pad.PaddingRight = UDim.new(0, 8)
+	pad.Parent = box
+
+	local send = button(holder, "Send", 32)
+	send.Size = UDim2.new(0, 68, 0, 32)
+	send.Position = UDim2.new(1, -68, 0, 22)
+
+	local function submit()
+		if box.Text ~= "" then
+			call(tool.id, { value = box.Text })
+		end
+	end
+	send.Activated:Connect(submit)
+	box.FocusLost:Connect(function(enterPressed)
+		if enterPressed then
+			submit()
+		end
+	end)
+end
+
 local function buildButton(tool: any)
-	local b = button(body, tool.label .. scopeTag(tool.scope), 36)
+	local b = button(currentParent, tool.label .. scopeTag(tool.scope), 36)
 	b.LayoutOrder = nextOrder()
 	b.Activated:Connect(function()
 		call(tool.id, nil)
@@ -466,6 +769,8 @@ for _, tool in ipairs(toolManifest) do
 		buildSliders(tool)
 	elseif kind == "blend" then
 		buildBlend(tool)
+	elseif kind == "text" then
+		buildText(tool)
 	else
 		buildButton(tool)
 	end

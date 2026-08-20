@@ -281,6 +281,10 @@ function Ambience.report(): string
 		#Ambience.keys(), voices))
 	local missing = Ambience.missing()
 	table.insert(lines, ("missing: %s"):format(#missing > 0 and table.concat(missing, ", ") or "nothing"))
+	local solo = AudioBed.solo()
+	if solo then
+		table.insert(lines, ("🔇 SOLO: %s - every other channel is muted"):format(solo))
+	end
 	return table.concat(lines, "\n")
 end
 

@@ -141,6 +141,7 @@ that exist in Studio but were never registered.
 - [x] **017** Storm core: position, intensity, and the server tick
 - [x] **018** Finish the storm's presence: time scale, lightning, cloud wall, audio
 - [x] **019** Living-world audio: ambience mixer, ocean beds, storm bed
+- [x] **020** Admin panel: collapsible sections, client-side tools, time-of-day and audio solo
 
 An unchecked job is still in flight.
 

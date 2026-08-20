@@ -80,6 +80,47 @@ export type Bed = {
 --- ±4% slow drift, on top of each voice's fixed detune. Shared so voices never beat against each other.
 local PITCH_DRIFT = 0.04
 
+--[[
+	SOLO - a testing affordance, module-level so one implementation covers every bed in the game.
+
+	Nine beds play at once and picking one out by ear is genuinely hard: `deadCalm` is deliberately
+	near-subsonic and `birds` peaks at 0.22. Solo mutes everything except the named channel.
+
+	🔴 APPLIED INSIDE `step`, NOT WRITTEN OVER THE TOP.
+
+	That is not a style choice. Every bed rewrites its voices' `Volume` on every tick, so anything that sets
+	Volume from outside is clobbered within 100 ms - the same trap the Studio guidance warns about for any
+	system that continuously writes a value. The override has to live where the value is computed.
+
+	🔴 SOLO ALSO FORCES THE CHANNEL AUDIBLE. This is the correction that made it useful.
+
+	The first version only muted the others, leaving the soloed channel at whatever level the world happened
+	to be asking for. At default conditions - Light Swell, daylight, no storm, low wind - SIX of the nine
+	channels are legitimately at zero, so soloing any of them produced dead silence and the control appeared
+	to do nothing. `thunder` was the worst case: it is a one-shot that only fires on a lightning strike, so it
+	is silent by definition until one happens.
+
+	Solo is a testing affordance, and the question a tester is asking is "what does this clip sound like",
+	not "what is the mix currently doing with it". So a soloed bed is driven to its own `maxVolume` regardless
+	of conditions. `naturalLevel()` still reports what the mix WOULD be asking for, so the honest number is
+	not lost - it is just not what you hear while auditioning.
+]]
+local soloChannel: string? = nil
+
+--- Solo one channel by name, or nil for normal mixing. Names are the `name` field of each config.
+function AudioBed.setSolo(name: string?)
+	soloChannel = if name == "" then nil else name
+end
+
+function AudioBed.solo(): string?
+	return soloChannel
+end
+
+--- Should this channel be heard right now? Also consulted by one-shots, which have no bed of their own.
+function AudioBed.audible(name: string): boolean
+	return soloChannel == nil or soloChannel == name
+end
+
 local function normaliseId(id: string): string
 	if id == "" then
 		return ""
@@ -235,7 +276,22 @@ function AudioBed.step(self: Bed, dt: number, serverTime: number)
 	end
 
 	local drift = math.sin((serverTime / (cfg.drift :: number)) * math.pi * 2) * PITCH_DRIFT
-	local target = self.level * (cfg.maxVolume :: number)
+
+	--[[
+		Solo folded into the target, so it cannot be clobbered by the next tick. See `soloChannel`.
+
+		Three cases: soloed (forced to full, so it can actually be heard), muted by someone else's solo, or
+		normal mixing.
+	]]
+	local name = cfg.name :: string
+	local target
+	if soloChannel == name then
+		target = cfg.maxVolume :: number
+	elseif soloChannel ~= nil then
+		target = 0
+	else
+		target = self.level * (cfg.maxVolume :: number)
+	end
 
 	for i = 1, n do
 		local s = self.parts[i]
@@ -295,6 +351,16 @@ function AudioBed.currentVolume(self: Bed): number
 	return v
 end
 
+--[[
+	What the mix would be asking for, ignoring solo.
+
+	Kept separate from what you can hear, so a solo readout can say "this is forced up; normally it would be
+	silent right now, because <reason>". Losing the honest number would make the panel lie in a different way.
+]]
+function AudioBed.naturalLevel(self: Bed): number
+	return self.level
+end
+
 function AudioBed.clipLength(self: Bed): number
 	local s = self.parts[1]
 	return if s then s.TimeLength else 0
@@ -304,6 +370,14 @@ end
 function AudioBed.describe(self: Bed): string
 	local cfg = self.config
 	local length = self:clipLength()
+	-- when soloed, show BOTH: what you hear, and what the mix would be asking for
+	if soloChannel == cfg.name then
+		return ("%-11s %-16s lvl %.2f  ◀ SOLO (forced; mix wants %.2f)"):format(
+			cfg.name :: string,
+			(cfg.id :: string):gsub("rbxassetid://", ""),
+			self:currentVolume(),
+			self.level * (cfg.maxVolume :: number))
+	end
 	return ("%-11s %-16s lvl %.2f  [%d voices, %s, +/-%.0f%% detune%s]%s"):format(
 		cfg.name :: string,
 		(cfg.id :: string):gsub("rbxassetid://", ""),

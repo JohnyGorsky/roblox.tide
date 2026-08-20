@@ -1,0 +1,11 @@
+# FINDING 0017: Admin tool 'scope' was metadata, not an execution context - so every tool inspecting CLIENT state reported from the server and was silently wrong
+
+**Project:** `roblox.tide`
+**Status:** open
+**Severity:** high
+**Created:** 2026-08-20 21:36:15
+
+**Symptom:** AdminTools declares scope 'global' or 'local' on every tool, documented as 'global = changes the world for everyone, local = affects only the caller'. That is a statement about what a tool AFFECTS, and it was quietly read as though it also controlled WHERE the handler runs. It does not. AdminClient always calls remote:InvokeServer, and AdminServer's handle() invokes tool.run directly, so every handler executes on the server without exception. The consequence: tools that inspect client-side state - 'Rain / spray / wall / lightning status' and 'Audio status (every channel)' - required StormVFX, CloudWallVFX, LightningVFX, StormAudio and Ambience on the SERVER, where those modules have never been started because they are only ever required by WeatherClient on the client. They therefore returned a truthful report about a context in which nothing exists: no rigs, no beds, running=false. Confidently, silently wrong. It went unnoticed for the same reason as finding 0011: the automated checks ran inside a single Studio Edit context which had itself started those modules moments earlier, so the state the handler looked for happened to be present. A test that constructs the thing it is verifying proves nothing about production. Fixed in job 020 by giving AdminClient a CLIENT_HANDLERS table keyed by tool id: if a client handler exists for an action, it runs locally and never touches the network. The tool definitions stay in ServerStorage so labels and options still come from the server, and everything that changes the world still goes through the server's authorisation - that security boundary is untouched. Only read-only client diagnostics and client-local audio control moved. General rule: for any tool, ask where the STATE lives, not what the tool affects. If the state is built on the client it can only be inspected on the client, and a scope field cannot fix that.
+**Where:** studio_game/ServerScriptService/AdminServer.server.luau + StarterPlayerScripts/AdminClient.local.luau
+**Repro / notes:** _TODO_
+**Fix idea:** _TODO_
