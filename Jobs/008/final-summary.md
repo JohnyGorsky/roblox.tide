@@ -25,3 +25,22 @@ _Documentation only — nothing implemented._
 - [x] Group 13 and GAME-0012 appear on the generated board (area `infra`, PLANNED, P1)
 - [x] Every relative link in the repo resolves
 - [ ] Nothing implemented — **planning only, by design**
+
+## Follow-up: the four open questions were answered (2026-08-20)
+
+Asked interactively and settled the same day, so the group is no longer blocked on design:
+
+- **Ships in production**, gated hard and fully logged. This promotes the audit log from nicety to hard
+  requirement, and means the attack test must be run against a *published* server rather than only Studio.
+- **One permission level** — owner only. No tester or streamer tiers until there is someone to add.
+- **Scope declared per tool**, enforced by the server, with no default. A per-tool scope table is now in
+  the manifest group; world tools are global (a sea state nobody else sees cannot be judged), player tools
+  are local.
+- **Allowlist hard-coded in a server-only module** — not `ReplicatedStorage`, not a DataStore. Changing who
+  has god powers should require repo access and a publish, and should be visible in `git diff`.
+
+One consequence worth carrying into every future admin job: **adding a tool means adding its authorisation
+check**. Because the panel ships live, a new tool with a missing re-check is a production vulnerability
+rather than a bug.
+
+Still needed: the owner's numeric **UserId**.

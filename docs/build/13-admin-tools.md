@@ -27,7 +27,7 @@ local ADMINS = { ["johnygorsky10"] = true }
 
 -- RIGHT - UserId is stable; keep the name only as a comment for readability
 local ADMINS = {
-    [123456789] = "johnygorsky10",  -- owner
+    [5025640608] = "johnygorsky10",  -- owner
 }
 ```
 
@@ -134,13 +134,48 @@ Surface the audits we already have, plus live numbers.
 
 Sections C–E should grow as their systems land, rather than being built ahead of them.
 
-## Open questions
+## Decided (2026-08-20)
 
-- **Does this ship in the live game?** A panel present in production is a permanent risk but invaluable for
-  live debugging. The alternative is stripping it at publish, which means it is never tested in the
-  environment that matters. Leaning: ship it, gate it hard, log everything.
-- **More than one permission level?** Owner vs tester vs streamer-safe (cosmetic tools only)?
-- **Should tool changes replicate to everyone or only the admin?** Sea state must be global to be judged;
-  noclip must be local. Each tool needs to declare which it is.
-- **Where does the allowlist live?** Hard-coded is simplest and safest; a DataStore-driven list allows
-  granting access without a publish, at the cost of another attack surface.
+| Question | Decision |
+|---|---|
+| Ship in production? | **Yes** — gated hard, every action logged server-side. The panel is worth most exactly when something breaks in a live server with real players, and shipping it means the security model is exercised where it matters rather than only in Studio |
+| Permission levels? | **One — owner only.** A permission system with a single user is speculative complexity. Add a tester tier when there is actually a tester |
+| Replication scope? | **Declared per tool.** Every tool definition carries `scope = "global" \| "local"`, and **the server enforces it** — the client never chooses. World tools are global because a sea state or storm cannot be judged if only one person sees it; player tools are local |
+| Allowlist storage? | **Hard-coded in a server-only module.** Not `ReplicatedStorage`, not a DataStore. The list that grants god powers should require repo access and a publish to change, and its history should be visible in `git diff` |
+
+### Scope table
+
+The starting assignment. Anything added later must declare its scope explicitly — there is no default.
+
+| Tool | Scope | Why |
+|---|---|---|
+| Sea state, blend, water sliders | `global` | Unjudgeable if only the admin sees it; the crew must share one sea |
+| Clock / phase, storm level, lightning | `global` | Same — weather is shared world state |
+| Spawn POI / vessel / enemy, advance stage | `global` | It is world content; it exists for everyone or not at all |
+| Teleport self | `local` | Moves one player |
+| Free camera, noclip, speed | `local` | Would be nonsense granted to everyone |
+| Invulnerability, heal/damage self | `local` | Ditto |
+| Grant items / weapons | `local` | Goes to the admin's own inventory |
+| Kill all enemies | `global` | Changes the world |
+| Diagnostics, audits, state dump | `local` | Read-only, admin's screen |
+
+### Consequences of shipping it live
+
+Because the panel ships, three things stop being optional:
+
+1. **The audit log is a real requirement, not a nicety** — in production it is the only way to tell a bug
+   from a person.
+2. **The attack test must be run against a published server**, not only Studio. A non-admin client in a
+   live server is the actual threat model.
+3. **Adding a tool means adding an authorisation check**, every time. A new tool with a missing re-check is
+   a production vulnerability, not a bug. This belongs in the review checklist for every future admin job.
+
+## Still open
+
+Nothing blocking — the group is ready to build.
+
+Owner UserId captured 2026-08-20: **`5025640608`** (`johnygorsky10`). Read via
+`StudioService:GetUserId()` in Edit mode, then confirmed by resolving the id back to a name with
+`Players:GetNameFromUserIdAsync`, so the pairing is verified rather than assumed. UserIds are public
+information, so this is safe to keep in the repo — it is the *authorisation check* that must stay
+server-side, not the id itself.

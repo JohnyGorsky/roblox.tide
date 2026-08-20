@@ -36,6 +36,19 @@ between tuning something ten times and tuning it once.
 - [ ] Usable on mobile: landscape, thumb-reachable, clear of the reserved touch rects
 - [ ] Sea tools first: state picker, blend slider, live water sliders, wave overlay
 - [ ] **Copy-as-Luau** — export current values as a `SeaStates` entry so tuning survives the session
+- [ ] Ships in the **published** game (decided) — so the audit log is a hard requirement, and the attack
+      test must be run against a published server, not only Studio
+- [ ] **One permission level** (owner only). No tester/streamer tiers until there is someone to add
+- [ ] Every tool definition declares `scope = "global" | "local"`, and **the server enforces it** — the
+      client never chooses. No default: a new tool without a declared scope is a bug
+- [ ] Allowlist is a **hard-coded table in a server-only module** — not `ReplicatedStorage`, not a
+      DataStore. Changing it requires a publish, and shows up in `git diff`
+- [x] Owner's **UserId** obtained: `5025640608` (`johnygorsky10`), verified by reverse name lookup
+
+## Decided
+
+Four questions were settled on 2026-08-20 — see [the manifest group](../../build/13-admin-tools.md)
+for the reasoning and the per-tool scope table.
 
 ## Out of scope
 
