@@ -105,16 +105,17 @@ Groups are sized to be taken one at a time. See [docs/build/README.md](docs/buil
 
 | Status | Count |
 |---|---|
-| GRAYBOX | 2 |
-| IDEA | 7 |
-| IMPLEMENTED | 3 |
+| GRAYBOX | 3 |
+| IDEA | 9 |
+| IMPLEMENTED | 5 |
 
 ### Graybox placeholders awaiting real art
 
 | Placeholder | Stands in for | Place | Note |
 |---|---|---|---|
-| `GB-LOBBY-DOCK` | ASSET-LOBBY-HARBOUR-DOCK | lobby | 64 x 4 x 40 WoodPlanks slab at Y=2, Weathered Wood colour. Exists because the lobby has |
-| `GB-GAME-DECK` | ASSET-BOAT-STARTER | game | 48 x 2 x 32 DiamondPlate deck at Y=3 with four low rails, Wet Steel. Exists because the game |
+| `GB-LOBBY-DOCK` | ASSET-LOBBY-HARBOUR-DOCK | lobby | 64 x 4 x 40 WoodPlanks slab at Y=2, Weathered Wood colour. Exists because the lobby has CharacterAutoLoads=true, so removing the baseplate would drop every joining player into the sea. Tagged Graybox with attribute GrayboxId=GB-LOBBY-DOCK. Keep the footprint when replacing - the spawn and future harbour layout are positioned against it. |
+| `GB-CLOUD-TEXTURE` | ASSET-CLOUD-WALL | game | The storm's cloud wall and all its rain/spray are built from BUILT-IN engine textures - rbxasset://textures/particles/smoke_main.dds for the cloud bank and spray, sparkles_main.dds for rain. Registered as graybox because smoke_main is standing in for real cloud art, and because the wall's whole look depends on one property of it: it is a soft radial ALPHA blob, so every particle fades to nothing at its own edge and the mass has no silhouette line anywhere. That is what made particles work where flat geometry failed - a transparent slab always reads as a grey card (job 018, four attempts). Approved by eye for the POC, so this is not urgent; the escalation, if it ever stops convincing, is a real cloud texture with an alpha channel. Costs nothing today and needs no moderation, which is why it shipped. |
+| `GB-GAME-DECK` | ASSET-BOAT-STARTER | game | 48 x 2 x 32 DiamondPlate deck at Y=3 with four low rails, Wet Steel. Exists because the game place runs CharacterAutoLoads=false by design, so a developer pressing Play gets no body and there is nothing to stand on. Paired with the admin panel's 'Spawn me a character' tool. Represents the starter vessel because standing on the launch's DECK is what replaces this - so the graybox audit will keep reporting it until GAME-0001 lands, which is intended. Delete it then; do not build anything that depends on its position. |
 
 Verify against the live places with `tools/audit-graybox.luau` - it catches placeholders
 that exist in Studio but were never registered.

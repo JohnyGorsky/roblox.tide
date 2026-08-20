@@ -78,6 +78,51 @@ assets:
     shared registry at roblox.workspace/Assets/registry/models.md. STILL MISSING a true flat-grey
     overcast - SnowGrey is the nearest free borrow; commission six faces to the palette if the calm
     states still read wrong.
+- id: ASSET-AUDIO-STORM-SET
+  type: audio
+  status: IMPLEMENTED
+  source: mixed
+  roblox_path: ReplicatedStorage.StormAudio
+  place: game
+  feature: GAME-0003
+  notes: >-
+    Four storm channels, ids held as DATA in StormAudio.luau (same pattern as ASSET-SKY-SET) so the set is
+    version-controlled rather than living as instances. windLow 93331028777865 and windHigh 96421007219531
+    are OURS, already scanned and logged for Jungle - windHigh must fade in, never play flat. rain
+    9112855484 is Pro Sound Effects, 36.0 s, and REPLACED our own 1.54 s upload 133061174808986 in job 019:
+    long enough for 2 voices at +/-2% detune instead of 4 at +/-13%, which removed a workaround rather than
+    tuning it. thunder 88316151105164 is ours, a 5.49 s one-shot, and must NOT contain rain - it is fired at
+    a moment chosen by its own flash, so anything baked in arrives at the wrong time.
+- id: ASSET-AUDIO-AMBIENCE-SET
+  type: audio
+  status: IMPLEMENTED
+  source: store
+  roblox_path: ReplicatedStorage.Ambience
+  place: game
+  feature: GAME-0003
+  notes: >-
+    Five ambience channels from Pro Sound Effects (Creator Store, free, verified), ids held as DATA in
+    Ambience.luau. oceanCalm 9120621776 33.1 s; oceanHeavy 9120610116 28.8 s; stormBed 9120018692 109.7 s;
+    birds 9112870863 70.4 s. deadCalm reuses 9120621776 at PlaybackSpeed 0.35 - the sea slowed until it
+    stops sounding like water - so it needs no asset of its own. Chosen for LENGTH (28-110 s where most
+    Roblox audio is 2-5), because length is what defeats audible looping. Licence is use-within-Roblox only:
+    these are not ours and cannot be reused outside Roblox. Two candidates were REJECTED on their
+    descriptions - 9117143192 Ocean Surf 1 has a prop plane fly-by and 9112870008 San Pedro Harbor 2 has a
+    helicopter fly-by; a vehicle baked into a loop recurs forever.
+- id: ASSET-AUDIO-VESSEL-SET
+  type: audio
+  status: IDEA
+  source: store
+  roblox_path: ReplicatedStorage.VesselAudio
+  place: game
+  feature: GAME-0001
+  notes: >-
+    Not yet built - needs a hull to be attached to (group 12's boat half). Engine idle/low/cruise/max plus
+    catch, fail, shutdown and damaged; hull creak light/stressed/severe; propeller and fouled propeller;
+    generator loop, surge and fault; pumps. Candidates already found and length-verified in the Boats - Bow
+    Wash category: 9112871242 Ship Stern Wash 1 at 36.0 s and 9112750614 Bow Wash Steady Trolling Speed at
+    36.0 s (40ft diesel fishing boat, subtle engine). THIS is the set that should use AudioEmitter rather
+    than the non-positional Sound beds - an engine genuinely has a position, unlike weather.
 - id: ASSET-SEABED-SAND
   type: terrain
   status: IMPLEMENTED
@@ -117,6 +162,36 @@ assets:
   notes: Sheltered harbour, 4096 x 4096 studs. Sand -48..-40, water -40..0. Shallower, greener and
     calmer than the open sea (WaveSize 0.06, Transparency 0.42) so the lobby reads as a safe bay.
     Verified by voxel read-back.
+- id: GB-CLOUD-TEXTURE
+  type: graybox
+  status: GRAYBOX
+  source: studio
+  represents: ASSET-CLOUD-WALL
+  place: game
+  roblox_path: ReplicatedStorage.CloudWallVFX
+  feature: GAME-0003
+  notes: >-
+    The storm's cloud wall and all its rain/spray are built from BUILT-IN engine textures -
+    rbxasset://textures/particles/smoke_main.dds for the cloud bank and spray, sparkles_main.dds for rain.
+    Registered as graybox because smoke_main is standing in for real cloud art, and because the wall's whole
+    look depends on one property of it: it is a soft radial ALPHA blob, so every particle fades to nothing at
+    its own edge and the mass has no silhouette line anywhere. That is what made particles work where flat
+    geometry failed - a transparent slab always reads as a grey card (job 018, four attempts). Approved by
+    eye for the POC, so this is not urgent; the escalation, if it ever stops convincing, is a real cloud
+    texture with an alpha channel. Costs nothing today and needs no moderation, which is why it shipped.
+- id: ASSET-CLOUD-WALL
+  type: image
+  status: IDEA
+  source: store
+  roblox_path: ReplicatedStorage.CloudWallVFX
+  place: game
+  feature: GAME-0003
+  notes: >-
+    A real cloud texture with an alpha channel, to replace smoke_main.dds in the cloud wall if the built-in
+    blob ever stops convincing. NOT currently needed - the particle bank was approved by eye on 2026-08-20.
+    Requirements if it is ever sourced: soft alpha falloff at every edge (a hard-edged texture reintroduces
+    the grey-card problem), no baked lighting or sun direction (the bank is lit by the scene at
+    LightInfluence 0.25), and tileable or large enough that repetition is not visible across a 140-degree arc.
 - id: GB-GAME-DECK
   type: graybox
   status: GRAYBOX

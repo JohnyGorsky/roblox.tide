@@ -73,17 +73,39 @@ def read_assets():
         return counts, graybox
     current = {}
     entries = []
+    # Key whose value is still being accumulated across continuation lines, and its indent.
+    folding = None
+    fold_indent = 0
     for raw in p.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
+        indent = len(raw) - len(raw.lstrip())
         if line.startswith("#") or not line:
             continue
+        # A continuation line: more indented than the key that opened it, and not a new key.
+        # Handles both YAML folded scalars (`notes: >-`) and plain wrapped values, which the
+        # first-line-only version truncated mid-sentence.
+        if folding and indent > fold_indent and not line.startswith("- "):
+            # A YAML key is `word:` followed by whitespace or end of line. Requiring that avoids
+            # mistaking a URL for a key - `rbxasset://...` has a colon and broke the naive check.
+            looks_like_key = re.match(r"^[a-z_][a-z0-9_]*:(\s|$)", line) is not None
+            if not looks_like_key:
+                current[folding] = (current.get(folding, "") + " " + line).strip()
+                continue
+        folding = None
         if line.startswith("- id:"):
             if current:
                 entries.append(current)
             current = {"id": line.split(":", 1)[1].strip()}
         elif ":" in line and current:
             k, v = line.split(":", 1)
-            current.setdefault(k.strip(), v.strip())
+            k, v = k.strip(), v.strip()
+            if v in (">-", ">", "|-", "|"):
+                # folded/literal scalar: the value lives on the following lines
+                current.setdefault(k, "")
+                folding, fold_indent = k, indent
+            else:
+                current.setdefault(k, v)
+                folding, fold_indent = k, indent
     if current:
         entries.append(current)
     for e in entries:
