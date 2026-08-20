@@ -21,3 +21,4 @@
 - [0019 — The storm advances on a clock; distance is bought by moving](0019-storm-advance-model.md)
 - [0020 — Everyday weather is separate from the storm, and it may not use the storm's language](0020-local-weather-vs-storm.md)
 - [0021 — Ambience carries the mood; there is no music in the POC](0021-audio-direction.md)
+- [0022 — Vessel physics: dense hull, server authority, four-point buoyancy](0022-vessel-physics-and-authority.md)
