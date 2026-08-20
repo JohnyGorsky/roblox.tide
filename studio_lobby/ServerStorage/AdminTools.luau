@@ -724,6 +724,67 @@ tools.lightningStrike = {
 }
 
 --[[
+	AUDIO. `scope = "local"` throughout - sound is a client thing, and a server-side audio report would
+	truthfully say nothing is playing.
+]]
+local function stormAudio()
+	local m = ReplicatedStorage:FindFirstChild("StormAudio")
+	if not m then return nil end
+	local ok, mod = pcall(require, m)
+	return ok and mod or nil
+end
+
+tools.audioReport = {
+	id = "audioReport",
+	label = "Audio status (what is still silent)",
+	section = "Audio",
+	scope = "local",
+	controls = { kind = "button", output = "text" },
+	run = function(_player: Player, _args: any)
+		local A = stormAudio()
+		if not A then return false, "StormAudio not found" end
+		return true, A.report()
+	end,
+}
+
+--[[
+	AUDITION a candidate id before it is committed to code.
+
+	The whole reason the empty slots are addressable at runtime. A clip judged on its Creator Store page is
+	heard alone and dry; the only question that matters is how it sounds UNDER the wind bed at the volume
+	curve the storm will actually give it. So: paste an id, hear it in place, then decide.
+
+	Nothing here writes the id to disk - a keeper still gets written into StormAudio and logged in the shared
+	registry by hand, which is the step that records the licence.
+]]
+tools.audioAudition = {
+	id = "audioAudition",
+	label = "Audition a sound id",
+	section = "Audio",
+	scope = "local",
+	controls = {
+		kind = "text",
+		placeholder = "slot=id, e.g.  rain=1234567890  or  thunder=1234567890",
+	},
+	run = function(_player: Player, args: any)
+		local A = stormAudio()
+		if not A then return false, "StormAudio not found" end
+		local raw = tostring(args and args.value or "")
+		local slot, id = raw:match("^%s*(%a+)%s*=%s*(.+)%s*$")
+		if not slot then
+			return false, "expected  slot=id  - slots are: windLow, windHigh, rain, thunder"
+		end
+		local ok, msg = A.setId(slot, id)
+		if not ok then return false, msg end
+		if slot == "thunder" then
+			A.thunder(600, 0.9) -- play it once so it can be heard immediately
+			return true, msg .. "\nplayed once at 600 studs. Force a strike to hear it in context."
+		end
+		return true, msg .. "\nlooping now - move the wind to hear it level."
+	end,
+}
+
+--[[
 	EVERYDAY WEATHER (decision 0020).
 
 	Its own section, deliberately, and not under Storm - because the whole point of the system is that the

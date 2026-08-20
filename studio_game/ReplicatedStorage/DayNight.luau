@@ -306,19 +306,7 @@ end
 ]]
 local function composeWater(state: any)
 	local Terrain = workspace.Terrain
-
-	-- Follow the same crossfade the wave field is using, so the look and the physics change together.
-	local fromName = workspace:GetAttribute("SeaBlendFrom")
-	local startedAt = workspace:GetAttribute("SeaBlendStartedAt")
-	local dur = workspace:GetAttribute("SeaBlendDuration")
-	local from = if typeof(fromName) == "string" then SeaStates.get(fromName) else nil
-	if from and typeof(startedAt) == "number" and typeof(dur) == "number" and dur > 0 then
-		local t = (workspace:GetServerTimeNow() - startedAt) / dur
-		if t > 0 and t < 1 then
-			state = SeaStates.lerp(from, state, t)
-		end
-	end
-
+	-- `state` already arrives blended, via SeaStates.currentBlended() in compose().
 	local water = state.water
 	Terrain.WaterColor = water.color
 	Terrain.WaterReflectance = water.reflectance
@@ -380,7 +368,15 @@ end
 ]]
 function DayNight.compose(): string
 	local base = timeBase()
-	local state = SeaStates.get(workspace:GetAttribute("SeaState") or "LightSwell") or SeaStates.LightSwell
+	--[[
+		BLENDED, not the target state.
+
+		Reading the target directly is what made band crossings snap: severity is the blend weight for
+		brightness, fog, ambient, the atmosphere and the clouds, so a discrete severity meant all five
+		stepped at once while the water eased. Coming through `currentBlended()` makes severity itself ramp,
+		and everything derived from it follows for free.
+	]]
+	local state = SeaStates.currentBlended()
 	local sev = math.clamp(state.severity or 0, 0, 1)
 
 	--[[
@@ -416,21 +412,34 @@ function DayNight.compose(): string
 		below it, the ratio. The threshold only ever catches The Wall - which is precisely the one state
 		that should not know what time it is.
 	]]
-	local ABSOLUTE_ABOVE = 0.9
-	local useAbsolute = sev >= ABSOLUTE_ABOVE
+	--[[
+		A narrow CROSSFADE between the two rules, not a hard switch.
+
+		It used to be `sev >= 0.9`, an if/else. That was correct in intent and visibly wrong in practice: at
+		the crossing, brightness, fog, ambient and the whole atmosphere all changed rule in a single frame,
+		which read as the sky glitching rather than as weather worsening. The gap between the two rules is
+		not small - a ratio against a bright afternoon and The Wall's own near-black absolutes are far apart.
+
+		Fading over 0.85..0.95 keeps both properties intact: below the window the hour still governs, above
+		it The Wall is still timeless, and the handover happens gradually enough not to be seen. Smoothstep
+		rather than linear so the fade has no corners at either end.
+	]]
+	local ABSOLUTE_FROM, ABSOLUTE_TO = 0.85, 0.95
+	local aw = math.clamp((sev - ABSOLUTE_FROM) / (ABSOLUTE_TO - ABSOLUTE_FROM), 0, 1)
+	aw = aw * aw * (3 - 2 * aw) -- smoothstep
+	local useAbsolute = aw > 0.5 -- only for the sky, which cannot be cross-faded at all
 
 	Lighting.ClockTime = base.clockTime
-	if useAbsolute then
-		Lighting.Brightness = state.sky.brightness
-		Lighting.FogEnd = state.sky.fogEnd
-		Lighting.FogStart = state.sky.fogStart
-		Lighting.FogColor = state.sky.fogColor
-	else
-		Lighting.Brightness = base.brightness * lerpN(1, brightFactor, sev)
-		Lighting.FogEnd = base.fogEnd * lerpN(1, fogFactor, sev)
-		Lighting.FogStart = Lighting.FogEnd * 0.06
-		Lighting.FogColor = base.fogColor:Lerp(state.sky.fogColor, sev)
-	end
+
+	-- ratio rule (weather darkens whatever hour it lands on) ... and absolute rule (The Wall is timeless)
+	local ratioBright = base.brightness * lerpN(1, brightFactor, sev)
+	local ratioFogEnd = base.fogEnd * lerpN(1, fogFactor, sev)
+	local ratioFogColor = base.fogColor:Lerp(state.sky.fogColor, sev)
+
+	Lighting.Brightness = lerpN(ratioBright, state.sky.brightness, aw)
+	Lighting.FogEnd = lerpN(ratioFogEnd, state.sky.fogEnd, aw)
+	Lighting.FogStart = lerpN(Lighting.FogEnd * 0.06, state.sky.fogStart, aw)
+	Lighting.FogColor = ratioFogColor:Lerp(state.sky.fogColor, aw)
 
 	--[[
 		Everyday weather closes the horizon a little (decision 0020).
@@ -457,14 +466,15 @@ function DayNight.compose(): string
 		math.clamp(weatherAmb.G * m, 0, 1),
 		math.clamp(weatherAmb.B * m, 0, 1)
 	)
-	Lighting.OutdoorAmbient = if useAbsolute then weatherAmb else baseAmb:Lerp(weatherAmb, sev)
+	-- Same crossfade as the fog and brightness above: ratio result, then eased toward the absolute one.
+	Lighting.OutdoorAmbient = baseAmb:Lerp(weatherAmb, sev):Lerp(weatherAmb, aw)
 
 	local atm = Lighting:FindFirstChildOfClass("Atmosphere")
 	if atm and state.atmosphere then
-		atm.Density = if useAbsolute then state.atmosphere.density else lerpN(base.atmDensity, state.atmosphere.density, sev)
-		atm.Haze = if useAbsolute then state.atmosphere.haze else lerpN(base.atmHaze, state.atmosphere.haze, sev)
-		atm.Color = if useAbsolute then state.atmosphere.color else base.atmColor:Lerp(state.atmosphere.color, sev)
-		atm.Decay = if useAbsolute then state.atmosphere.decay else base.atmDecay:Lerp(state.atmosphere.decay, sev)
+		atm.Density = lerpN(lerpN(base.atmDensity, state.atmosphere.density, sev), state.atmosphere.density, aw)
+		atm.Haze = lerpN(lerpN(base.atmHaze, state.atmosphere.haze, sev), state.atmosphere.haze, aw)
+		atm.Color = base.atmColor:Lerp(state.atmosphere.color, sev):Lerp(state.atmosphere.color, aw)
+		atm.Decay = base.atmDecay:Lerp(state.atmosphere.decay, sev):Lerp(state.atmosphere.decay, aw)
 		atm.Offset = state.atmosphere.offset
 		atm.Glare = state.atmosphere.glare * sev
 	end

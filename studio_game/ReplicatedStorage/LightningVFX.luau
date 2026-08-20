@@ -29,21 +29,130 @@ local LightningVFX = {}
 local BOLT_PALE = Color3.fromRGB(226, 238, 250)
 
 --[[
-	Our flash sits ON TOP of whatever exposure the place already had, and is restored to it rather than to
-	zero.
+	🔴 THREE LIGHT CHANNELS, AND WHY IT TAKES THREE.
 
-	The baseline is captured on first use instead of assumed to be 0, because a place, a future colour-grade
-	pass, or a player accessibility setting may legitimately have set it. Writing `baseline + ours` means
-	lightning brightens whatever it finds and hands it back untouched when the storm passes.
+	Exposure alone was not enough. `ExposureCompensation` is a TONEMAP - it rescales the frame that was
+	already rendered, so everything brightens by the same proportion and nothing is actually *lit*. A dark
+	deck stays a flat dark shape, just a paler one. The eye reads that as the gamma being nudged, not as the
+	sky having gone off.
+
+	So a strike now drives all three of these together:
+
+	  1. ExposureCompensation  the frame-wide response. Fast, cheap, and the wrong tool on its own.
+	  2. Lighting.Ambient      REAL global illumination, including into shadow. This is the one that makes
+	                           the world look struck rather than merely brighter.
+	  3. a PointLight          local falloff near the camera, so surfaces closest to the crew catch it
+	                           hardest and the deck and water get a highlight that moves with the strike's
+	                           direction. Falloff is what sells it as a light source having a position.
+
+	Plus PointLights on the bolt itself, so it glows into the fog around it instead of being a flat bright
+	shape drawn on top of the murk.
+
+	--------------------------------------------------------------------------------------------------
+	WHY `Ambient` IS SAFE TO TAKE
+
+	`DayNight.compose()` writes Brightness, ClockTime, Fog*, and **OutdoorAmbient**. It does not write
+	`Ambient` - verified by grep, and they are genuinely different properties: OutdoorAmbient is the
+	sky-lit term, Ambient is the floor applied everywhere including shadow. So lightning can own Ambient
+	outright, the same way it owns ExposureCompensation, and there is still exactly one writer per property.
+
+	If you ever need Ambient for something else, route it through the composer instead of adding a second
+	writer - two writers on a Lighting property produce a flicker that looks like anything except two
+	systems disagreeing.
+
+	Both baselines are captured on FIRST USE rather than assumed, because a place, a colour-grade pass, or a
+	player accessibility setting may legitimately have set them. `baseline + ours` means lightning brightens
+	whatever it finds and hands it back untouched.
 ]]
 local baselineExposure: number? = nil
+local baselineAmbient: Color3? = nil
 local ourExposure = 0
 
-local function applyExposure()
+--- How much Ambient a full-strength flash adds. Tuned so a close strike lights the deck without flattening it.
+local AMBIENT_GAIN = 0.55
+--- PointLight brightness at full strength. Roblox lights cap their Range at 120 studs.
+local LIGHT_GAIN = 14
+local LIGHT_RANGE = 120
+
+local flashLight: PointLight? = nil
+local flashLightPart: BasePart? = nil
+
+--[[
+	The local light rides a part near the camera rather than being parented to the camera directly, because a
+	Light must sit on a BasePart or Attachment to exist at all. Offset ABOVE and toward the strike, so the
+	falloff runs down onto the deck and the water the way skylight would.
+]]
+local function ensureFlashLight(): PointLight?
+	if flashLight and flashLight.Parent and flashLightPart and flashLightPart.Parent then
+		return flashLight
+	end
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return nil
+	end
+	local p = Instance.new("Part")
+	p.Name = "LightningLight"
+	p.Size = Vector3.one
+	p.Transparency = 1
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Parent = camera
+	local light = Instance.new("PointLight")
+	light.Name = "Flash"
+	light.Color = BOLT_PALE
+	light.Range = LIGHT_RANGE
+	light.Brightness = 0
+	light.Shadows = true -- shadows are most of why this reads as a light rather than a wash
+	light.Enabled = false
+	light.Parent = p
+	flashLight, flashLightPart = light, p
+	return light
+end
+
+local function applyLight(amount: number, direction: Vector3?)
 	if baselineExposure == nil then
 		baselineExposure = Lighting.ExposureCompensation
 	end
-	Lighting.ExposureCompensation = (baselineExposure :: number) + ourExposure
+	if baselineAmbient == nil then
+		baselineAmbient = Lighting.Ambient
+	end
+	Lighting.ExposureCompensation = (baselineExposure :: number) + amount
+
+	-- Ambient: real illumination, clamped so a double strike cannot wash the scene to white.
+	local lift = math.clamp(amount, 0, 1.5) * AMBIENT_GAIN
+	local base = baselineAmbient :: Color3
+	Lighting.Ambient = Color3.new(
+		math.clamp(base.R + BOLT_PALE.R * lift, 0, 1),
+		math.clamp(base.G + BOLT_PALE.G * lift, 0, 1),
+		math.clamp(base.B + BOLT_PALE.B * lift, 0, 1)
+	)
+
+	local light = ensureFlashLight()
+	if light and flashLightPart then
+		light.Brightness = amount * LIGHT_GAIN
+		light.Enabled = amount > 0.01
+		local camera = workspace.CurrentCamera
+		if camera then
+			local toward = direction or Vector3.new(0, 0, -1)
+			flashLightPart.Position = camera.CFrame.Position + Vector3.new(0, 42, 0) + toward * 26
+		end
+	end
+end
+
+local function restoreLight()
+	if baselineExposure ~= nil then
+		Lighting.ExposureCompensation = baselineExposure :: number
+	end
+	if baselineAmbient ~= nil then
+		Lighting.Ambient = baselineAmbient :: Color3
+	end
+	if flashLight then
+		flashLight.Brightness = 0
+		flashLight.Enabled = false
+	end
 end
 
 --[[
@@ -86,6 +195,28 @@ local function drawBolt(strike: Lightning.Strike, origin: Vector3)
 		part.Size = Vector3.new(width, width, delta.Magnitude)
 		part.CFrame = CFrame.lookAt(previous + delta * 0.5, nextPoint)
 		part.Parent = model
+
+		--[[
+			Light ON the bolt, brightest at the bottom.
+
+			Without this a bolt is a bright shape drawn *on top of* the fog rather than a light source
+			inside it. A PointLight makes the surrounding murk glow, which is what gives the strike a
+			position in the world instead of on the screen.
+
+			Only the lower half gets lights: the top of a bolt is far above anything that could catch the
+			light, so those would cost frames and illuminate nothing. Range caps at 120 studs engine-side,
+			so this lights the strike's immediate surroundings and the water under it, not the whole sea.
+		]]
+		if i > segments // 2 then
+			local glow = Instance.new("PointLight")
+			glow.Color = BOLT_PALE
+			glow.Range = LIGHT_RANGE
+			-- brightest at the waterline, where there is actually something to light
+			glow.Brightness = (6 + 10 * strike.magnitude) * (i / segments)
+			glow.Shadows = false -- the bolt is inside its own light; shadows here only produce artefacts
+			glow.Parent = part
+		end
+
 		previous = nextPoint
 	end
 
@@ -107,7 +238,7 @@ end
 	each frame instead means overlapping strikes at intensity 4 blend into one continuous storm-lit sky
 	rather than summing and clipping to white.
 ]]
-type LiveFlash = { peak: number, startedAt: number, up: number, down: number }
+type LiveFlash = { peak: number, startedAt: number, up: number, down: number, direction: Vector3 }
 
 local liveFlashes: { LiveFlash } = {}
 local flashConnection: RBXScriptConnection? = nil
@@ -115,6 +246,7 @@ local flashConnection: RBXScriptConnection? = nil
 local function stepFlashes()
 	local nowClock = os.clock()
 	local strongest = 0
+	local strongestDir: Vector3? = nil
 	local i = 1
 	while i <= #liveFlashes do
 		local f = liveFlashes[i]
@@ -129,21 +261,23 @@ local function stepFlashes()
 				local t = (elapsed - f.up) / f.down
 				contribution = f.peak * (1 - t) * (1 - t) -- eased out, so the tail lingers slightly
 			end
-			strongest = math.max(strongest, contribution)
+			if contribution > strongest then
+				strongest = contribution
+				-- the light points from whichever strike is currently dominant, so overlapping strikes
+				-- swing the highlight around rather than averaging into a directionless wash
+				strongestDir = f.direction
+			end
 			i += 1
 		end
 	end
 
 	ourExposure = strongest
-	applyExposure()
+	applyLight(strongest, strongestDir)
 
 	if #liveFlashes == 0 and flashConnection then
 		flashConnection:Disconnect()
 		flashConnection = nil
-		-- Leave the property exactly as we found it once the sky is quiet again.
-		if baselineExposure ~= nil then
-			Lighting.ExposureCompensation = baselineExposure :: number
-		end
+		restoreLight() -- leave every property exactly as we found it once the sky is quiet again
 	end
 end
 
@@ -167,6 +301,7 @@ local function flash(strike: Lightning.Strike)
 		startedAt = os.clock(),
 		up = 0.035,
 		down = 0.16 + 0.12 * strike.magnitude,
+		direction = Lightning.directionOf(strike),
 	})
 	if not flashConnection then
 		flashConnection = RunService.Heartbeat:Connect(stepFlashes)

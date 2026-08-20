@@ -28,6 +28,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StormVFX = require(ReplicatedStorage:WaitForChild("StormVFX"))
 local LightningVFX = require(ReplicatedStorage:WaitForChild("LightningVFX"))
 local CloudWallVFX = require(ReplicatedStorage:WaitForChild("CloudWallVFX"))
+local StormAudio = require(ReplicatedStorage:WaitForChild("StormAudio"))
 
 --[[
 	Rain and spray follow the camera, so they need a camera. In a fresh session the CurrentCamera can be nil
@@ -39,6 +40,20 @@ end
 
 StormVFX.start()
 CloudWallVFX.start()
+StormAudio.start()
+
+--[[
+	Audio is levelled on its own loop rather than inside the VFX step.
+
+	10 Hz is plenty for a volume ramp and costs nothing, and keeping it off RenderStepped means the wind does
+	not stutter when the frame rate does - a wind bed that wavers with framerate is very audible.
+]]
+task.spawn(function()
+	while true do
+		StormAudio.step(0.1)
+		task.wait(0.1)
+	end
+end)
 
 --[[
 	Both rigs are parented to the CAMERA, and the camera is replaced when the character respawns. Rebuild on
@@ -84,6 +99,8 @@ local Lightning = require(ReplicatedStorage:WaitForChild("Lightning"))
 local THUNDER_LOG_WITHIN = 900
 
 LightningVFX.onThunder(function(strike)
+	-- Plays if a clip has been filled in, and silently does nothing while the slot is empty.
+	StormAudio.thunder(strike.distance, strike.magnitude or 0.7)
 	if strike.distance <= THUNDER_LOG_WITHIN then
 		print(("[THUNDER] %.0f studs, %.1fs after the flash%s"):format(
 			strike.distance,

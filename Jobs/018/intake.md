@@ -2,7 +2,7 @@
 
 **Project**: `roblox.tide`
 **Created**: 2026-08-20 14:42:16
-**Status**: Requirements Gathering (intake)
+**Status**: ✅ Completed
 
 ## Requirements / goal
 
@@ -10,7 +10,12 @@ Group 07's remaining pieces, chosen over the boat so the storm is finished befor
 
 ## Checklist
 
-- [ ] Requirements reviewed (this intake)
-- [ ] Implementation plan created & agreed
-- [ ] Implementation completed
-- [ ] Final summary + changelog written
+- [x] Requirements reviewed (this intake)
+- [x] Implementation plan created & agreed
+- [x] Implementation completed — **plus** everyday weather (decision 0020, added mid-job by the user), the
+      missing Terrain-water writer, the never-started client, and a smoothness pass
+- [x] Final summary + changelog written
+
+**Not delivered:** the rain and thunder clips (the user is sourcing them; spec in
+`roblox.workspace/Assets/registry/audio.md`) and screen-level rain streaks. Thunder *timing* is live and
+testable without a clip.

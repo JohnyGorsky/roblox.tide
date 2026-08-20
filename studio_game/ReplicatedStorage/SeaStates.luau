@@ -351,6 +351,43 @@ function SeaStates.get(id: string): SeaState?
 	return (SeaStates :: any)[id]
 end
 
+--[[
+	The sea RIGHT NOW, interpolated if a state change is still in flight.
+
+	🔴 EVERYTHING THAT WANTS THE CURRENT SEA MUST COME THROUGH HERE.
+
+	This exists because of a bug that made the storm feel mechanical. Each caller used to look up the target
+	state by name and read its numbers directly, which meant every value derived from `severity` - brightness,
+	fog, ambient, the atmosphere, the cloud cover - JUMPED the instant the storm crossed a band, while the
+	water colour and the wave field crossfaded smoothly over six seconds. Half the world eased and half of it
+	snapped, and the snap is what the eye notices.
+
+	One implementation, three callers (the composer, everyday weather, and the wave field's own blend), so
+	they cannot disagree about how far through a transition the sea is.
+
+	The blend state lives on Workspace attributes, written by `WaveField.setState`, for the usual reason:
+	each context has its own copy of this module, so an upvalue would let the server and the clients believe
+	different things about the weather.
+]]
+function SeaStates.currentBlended(): SeaState
+	local target = SeaStates.get(workspace:GetAttribute("SeaState") or "LightSwell") or SeaStates.LightSwell
+	local fromName = workspace:GetAttribute("SeaBlendFrom")
+	local startedAt = workspace:GetAttribute("SeaBlendStartedAt")
+	local duration = workspace:GetAttribute("SeaBlendDuration")
+	if typeof(fromName) ~= "string" or typeof(startedAt) ~= "number" or typeof(duration) ~= "number" or duration <= 0 then
+		return target
+	end
+	local from = SeaStates.get(fromName)
+	if not from then
+		return target
+	end
+	local t = (workspace:GetServerTimeNow() - startedAt) / duration
+	if t <= 0 or t >= 1 then
+		return target
+	end
+	return SeaStates.lerp(from, target, t)
+end
+
 --- Linear interpolation between two states, so weather *arrives* instead of snapping.
 --- Returns a synthetic state; `id`/`name`/`audioBed` are taken from whichever side is dominant.
 function SeaStates.lerp(a: SeaState, b: SeaState, t: number): SeaState

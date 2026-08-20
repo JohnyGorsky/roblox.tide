@@ -179,7 +179,7 @@ function StormFront.apply()
 				local ok, WaveField = pcall(require, wf)
 				if ok then
 					-- blend the physical sea too, so the water does not step
-					WaveField.setState(state, 6)
+					WaveField.setState(state, 9) -- ONE blend drives everything: water, light, fog, clouds, weather weight
 				end
 			end
 			workspace:SetAttribute("SeaState", band.sea)

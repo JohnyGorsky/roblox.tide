@@ -56,8 +56,10 @@ dialog, or restart Studio. It blocks the last two admin checks:
 
 | Feature | Status | Notes |
 |---|---|---|
-| `GAME-0011` Sea & Sea States | `IN_PROGRESS` | Ocean + harbour built and verified. Five states in `SeaStates.luau`. Look **not approved**; blocked on sky assets |
-| `GAME-0012` Admin Panel | `IN_PROGRESS` | Built in both places. **F4** or the **ADM** button (bottom-right). 7 tools in game, 3 in lobby. Gate attack-tested and passed |
+| `GAME-0011` Sea & Sea States | `IN_PROGRESS` | Ocean + harbour built and verified. Five states in `SeaStates.luau`. Skies sourced; look approved |
+| `GAME-0003` Advancing Storm Front | `IN_PROGRESS` | Front advances, world ticks, everyday weather drifts, lightning strikes, cloud wall astern. **Not done: damage when caught** — The Wall only *looks* unsurvivable |
+| `GAME-0004` Day/Night | `IN_PROGRESS` | 575 s cycle. `DayNight.compose()` is the sole writer of Lighting, Terrain water and the cloud layer |
+| `GAME-0012` Admin Panel | `IN_PROGRESS` | Both places. **F4** or **ADM** (bottom-right). **32 tools** in game across Sea / Weather / Storm / Audio / Diagnostics. Gate attack-tested and passed |
 
 ---
 
@@ -65,9 +67,9 @@ dialog, or restart Studio. It blocks the last two admin checks:
 
 | # | What | Why |
 |---|---|---|
-| 1 | **Unwedge Studio's Play** | Blocks the final two admin checks — the only outstanding verification |
-| 2 | Judge the sea and harbour screenshots | Shape and horizon work; colour does not |
-| 3 | **finding 0006** — overcast sky assets | Proven blocker on the whole art direction, both places |
+| 1 | **Judge the storm approach** | Panel → Storm → **Watch a full approach (10x)**, then look ASTERN. Everything in job 018 is unjudged by a human |
+| 2 | **Two sound clips** — rain loop, thunder one-shot | Spec + rules in `Assets/registry/audio.md`. Audition them live via Audio → Audition a sound id; no code change needed |
+| 3 | **Unwedge Studio's Play** | Blocks the non-admin refusal check — the only outstanding admin verification |
 | 4 | **finding 0004** — game place is `Fully Open` | A stranger could deep-link into a running expedition |
 | 5 | **finding 0005** — Social Slots on the game place | A friend could drop into a 6-slot crew mid-run |
 | 6 | todo 0003 — measure `LightingStyle = Realistic` on a phone | You chose the expensive path; cost unmeasured |
@@ -77,9 +79,19 @@ dialog, or restart Studio. It blocks the last two admin checks:
 
 ## Recommended next move
 
-**Source the overcast skies** (finding 0006) — group 01 cannot finish without them, and everything else in
-the sea look is done. Creator Store search is the fast route; Claude presents candidates for approval per
-the asset policy.
+**[02](build/02-boat-parts.md) vessel foundation.** Groups 01 and 07 are now built as far as they can go
+without a deck to stand on: the sea, its states, the wave field, the day/night cycle, everyday weather and
+the storm all exist and all tick. The next thing that changes the game rather than the scene is the hull.
+
+It also makes the storm's central mechanic real for the first time. `StormFront` buys distance for northward
+travel and there is nothing to travel with, so today the front simply closes — which is exactly what a
+fuel-less crew will experience, and nothing else.
+
+Two constraints already logged: `ReplicationFocus` must point at the vessel (streaming is on), and buoyancy
+must be custom, because Roblox terrain-water waves exist only in the shader
+([finding 0008](../findings/0008-roblox-terrain-water-waves-exist-only-in.md)) so engine auto-buoyancy pulls
+toward a flat Y=0 plane and will fight the wave field — and the symptom looks like jitter rather than like a
+conflict.
 
 **Then**, in this order (see [the manifest](build/README.md) for why):
 

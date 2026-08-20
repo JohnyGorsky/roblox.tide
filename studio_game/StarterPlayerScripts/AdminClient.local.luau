@@ -445,6 +445,65 @@ local function buildBlend(tool: any)
 	end)
 end
 
+--[[
+	A free-text control: a box plus a send button.
+
+	Added for auditioning sound ids (job 018). The point is that a candidate clip cannot be judged from its
+	Creator Store page - it has to be heard under the wind bed at the volume curve the storm gives it - so
+	the id has to be pasteable at runtime rather than compiled in.
+
+	`ClearTextOnFocus = false` deliberately: the usual use is pasting one id, tweaking a digit, and sending
+	again, and clearing on focus makes that infuriating.
+]]
+local function buildText(tool: any)
+	local holder = Instance.new("Frame")
+	holder.Size = UDim2.new(1, 0, 0, 62)
+	holder.BackgroundTransparency = 1
+	holder.LayoutOrder = nextOrder()
+	holder.Parent = body
+
+	local title = label(holder, tool.label .. scopeTag(tool.scope), 13)
+	title.Size = UDim2.new(1, 0, 0, 18)
+
+	local box = Instance.new("TextBox")
+	box.Size = UDim2.new(1, -74, 0, 32)
+	box.Position = UDim2.new(0, 0, 0, 22)
+	box.BackgroundColor3 = Color3.fromRGB(18, 32, 44)
+	box.BorderSizePixel = 0
+	box.Font = FONT
+	box.TextSize = 13
+	box.TextColor3 = TEXT
+	box.PlaceholderText = (tool.controls and tool.controls.placeholder) or ""
+	box.PlaceholderColor3 = Color3.fromRGB(110, 128, 142)
+	box.Text = ""
+	box.ClearTextOnFocus = false
+	box.TextXAlignment = Enum.TextXAlignment.Left
+	box.Parent = holder
+	corner(box, 6)
+	stroke(box, LINE)
+
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, 8)
+	pad.PaddingRight = UDim.new(0, 8)
+	pad.Parent = box
+
+	local send = button(holder, "Send", 32)
+	send.Size = UDim2.new(0, 68, 0, 32)
+	send.Position = UDim2.new(1, -68, 0, 22)
+
+	local function submit()
+		if box.Text ~= "" then
+			call(tool.id, { value = box.Text })
+		end
+	end
+	send.Activated:Connect(submit)
+	box.FocusLost:Connect(function(enterPressed)
+		if enterPressed then
+			submit()
+		end
+	end)
+end
+
 local function buildButton(tool: any)
 	local b = button(body, tool.label .. scopeTag(tool.scope), 36)
 	b.LayoutOrder = nextOrder()
@@ -466,6 +525,8 @@ for _, tool in ipairs(toolManifest) do
 		buildSliders(tool)
 	elseif kind == "blend" then
 		buildBlend(tool)
+	elseif kind == "text" then
+		buildText(tool)
 	else
 		buildButton(tool)
 	end

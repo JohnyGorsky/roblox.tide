@@ -41,6 +41,10 @@
 	system whose whole point is that it takes minutes to change.
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local SeaStates = require(ReplicatedStorage:WaitForChild("SeaStates"))
+
 local LocalWeather = {}
 
 --[[
@@ -138,9 +142,18 @@ end
 	dangerous failure of this whole design.
 ]]
 local function weatherWeight(): number
-	local i = workspace:GetAttribute("StormIntensity")
-	local intensity = if typeof(i) == "number" then i else 0
-	return math.clamp(1 - intensity / 4, 0, 1)
+	--[[
+		From the BLENDED severity, not from StormIntensity.
+
+		Intensity is an integer, so weighting off it made the weather's whole contribution - waves, wind, fog
+		- step in one frame every time the storm crossed a band. Severity comes through
+		`SeaStates.currentBlended()`, so it ramps across the crossfade and this ramps with it.
+
+		Reaches zero at severity 0.8 (Storm), rather than only inside The Wall: by the time the front is that
+		close, an independent breeze is not a thing that should still be modulating the sea.
+	]]
+	local sev = SeaStates.currentBlended().severity or 0
+	return math.clamp(1 - sev / 0.8, 0, 1)
 end
 
 local function stormWind(): number
