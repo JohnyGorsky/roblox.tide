@@ -86,6 +86,15 @@ export type SeaState = {
 		so a state that does not name its own sky can never fully change the sea's mood.
 	]]
 	skyId: string,
+	--[[
+		How hard this weather overrides the time of day, 0..1. See decision 0018.
+
+		This is NOT decoration - it is the blend weight. At 0 the time of day wins entirely, so a calm
+		night reads as night. At 1 the time contributes nothing, which is why The Wall looks identical at
+		noon and midnight: inside the front there is no sun, no stars and no horizon to tell the hour by.
+		That falls out of the arithmetic rather than needing a special case.
+	]]
+	severity: number,
 	atmosphere: AtmosphereSpec,
 	wave: WaveSpec,
 	spray: number, -- 0..1 drives whitecap/spray density in the VFX layer
@@ -140,6 +149,7 @@ SeaStates.DeadCalm = {
 		color = Color3.fromRGB(150, 165, 175), -- pale, clean air: you can see for miles, which is the problem
 		decay = Color3.fromRGB(86, 100, 112),
 	},
+	severity = 0.00, -- time wins entirely
 	skyId = "SunlessBlue", -- cold and clear, no sun disc - the calm that feels wrong
 	wave = { amplitude = 0.15, length = 90, speed = 4, choppiness = 0.0, directionSpread = 0.1, directionDeg = 0 },
 	spray = 0.0,
@@ -170,6 +180,7 @@ SeaStates.LightSwell = {
 		color = Color3.fromRGB(132, 145, 154),
 		decay = Color3.fromRGB(58, 68, 80),
 	},
+	severity = 0.15, -- barely tints the hour
 	skyId = "SnowGrey", -- flat grey overcast: the working sea
 	wave = { amplitude = 0.8, length = 70, speed = 11, choppiness = 0.2, directionSpread = 0.2, directionDeg = 8 },
 	spray = 0.1,
@@ -200,6 +211,7 @@ SeaStates.Choppy = {
 		color = Color3.fromRGB(120, 132, 141),
 		decay = Color3.fromRGB(58, 68, 80),
 	},
+	severity = 0.45, -- weather tints heavily
 	skyId = "FogOnWater", -- weather closing in
 	wave = { amplitude = 2.0, length = 55, speed = 15, choppiness = 0.5, directionSpread = 0.4, directionDeg = 15 },
 	spray = 0.35,
@@ -230,6 +242,7 @@ SeaStates.Storm = {
 		color = Color3.fromRGB(86, 96, 105),
 		decay = Color3.fromRGB(30, 36, 44),
 	},
+	severity = 0.80, -- weather nearly wins
 	skyId = "AngryHeavens", -- dark storm cloud
 	wave = { amplitude = 4.5, length = 45, speed = 20, choppiness = 0.8, directionSpread = 0.6, directionDeg = 22 },
 	spray = 0.75,
@@ -259,7 +272,16 @@ SeaStates.TheWall = {
 		fogEnd = 330, -- you cannot see the bow of a large vessel
 		fogColor = Color3.fromRGB(6, 7, 9), -- matched to BlackVoid: no seam between fog and sky
 		outdoorAmbient = 0.35,
-		brightness = 1.0,
+		--[[
+			0.30, not 1.0. The Wall is applied ABSOLUTELY (severity 1.0 bypasses the time base, see
+			DayNight), so this number must be darker than the darkest HOUR or entering the front at night
+			would make it brighter - which is exactly what 1.0 did: night-Storm 0.44, night-Wall 1.00.
+
+			It also happens to be the right design answer. "You cannot tell noon from midnight inside the
+			front" means noon must look like midnight, so the correct value is near-black regardless of
+			the hour.
+		]]
+		brightness = 0.30,
 	},
 	atmosphere = {
 		density = 0.85, offset = 0.10, haze = 2.0, glare = 0.0,
@@ -277,7 +299,8 @@ SeaStates.TheWall = {
 		failure. The mitigation is below: fogColor is matched to the void so there is no seam between
 		fog and sky - enveloping rather than a lid.
 	]]
-		skyId = "BlackVoid",
+		severity = 1.00, -- weather total - The Wall is timeless
+	skyId = "BlackVoid",
 	wave = { amplitude = 7.5, length = 38, speed = 26, choppiness = 1.0, directionSpread = 0.9, directionDeg = 30 },
 	spray = 1.0,
 	audioBed = "sea_the_wall",
@@ -345,6 +368,7 @@ function SeaStates.lerp(a: SeaState, b: SeaState, t: number): SeaState
 		name = dominant.name,
 		description = dominant.description,
 		skyId = dominant.skyId,
+		severity = n(a.severity, b.severity),
 		water = {
 			color = c(a.water.color, b.water.color),
 			reflectance = n(a.water.reflectance, b.water.reflectance),
