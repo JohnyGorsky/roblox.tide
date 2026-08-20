@@ -52,11 +52,14 @@ local state = {
 	drive = nil :: VectorForce?,
 	righting = nil :: AlignOrientation?,
 	yaw = nil :: AngularVelocity?,
+	trim = nil :: Torque?,
 	stiffness = 0,
 	damping = 0,
 	drag = 0,
+	linearDrag = 0,
 	maxDepth = 0,
-	seat = nil :: Seat?,
+	console = nil :: BasePart?,
+	prompt = nil :: ProximityPrompt?,
 	driver = nil :: Player?,
 	throttle = 0,
 	steer = 0,
@@ -105,6 +108,7 @@ local function buildVessel()
 	state.stiffness = VesselPhysics.stiffness(mass, spec.draft, points, gravity)
 	state.damping = VesselPhysics.damping(state.stiffness, mass, points)
 	state.drag = VesselPhysics.dragCoefficient(spec.thrust, spec.cruise)
+	state.linearDrag = VesselPhysics.linearDrag(spec.thrust, spec.cruise)
 	--[[
 		Cap the lift a single fully-submerged point can make at roughly twice the draft's worth. The spring is
 		linear, so a hull thrown 7 studs deep by a storm wave would otherwise be launched back out like a
@@ -137,31 +141,74 @@ local function buildVessel()
 	local drive = Instance.new("VectorForce")
 	drive.Name = "Drive"
 	drive.Attachment0 = driveAt
-	drive.RelativeTo = Enum.ActuatorRelativeTo.Attachment0 -- follows the heading; +Z is forward
+	--[[
+		🔴 WORLD-RELATIVE, aimed explicitly along the hull's LookVector every frame.
+
+		This was `Attachment0`-relative with `Force = (0, 0, net)`, on the assumption that local +Z is forward.
+		It is NOT: `CFrame.LookVector` in Roblox is **-Z**. So thrust pushed the boat BACKWARD while
+		`forwardSpeed` was measured forward - which made drag come out with the wrong sign and ADD to thrust
+		instead of opposing it.
+
+		That is a positive feedback loop. Speed rose without limit and flung the driver to their death. It read
+		as "it speeds up fast and I die", which is exactly what it was.
+
+		Aiming the force explicitly costs one vector multiply per frame and removes the entire class of
+		sign-convention error. Worth it.
+	]]
+	drive.RelativeTo = Enum.ActuatorRelativeTo.World
 	drive.ApplyAtCenterOfMass = true
 	drive.Force = Vector3.zero
 	drive.Parent = hull
 	state.drive = drive
 
-	--[[
-		The righting moment. `PrimaryAxisOnly` keeps the deck level-ish while leaving YAW completely free, so
-		steering is not fighting it.
+--[[
+		🔴 NO AlignOrientation. REMOVED after auditing against the physics reference.
 
-		`Responsiveness` low on purpose: a boat should right itself over a second or two, not snap. This is
-		the dial decision 0022 calls the most important feel number - too low capsizes, too high makes the
-		storm a light show.
+		There was one here, `PrimaryAxisOnly`, to keep the deck level. It is gone, and the reference says why:
+		**"Don't stack two constraints controlling the same DOF (they oscillate)."**
+
+		Three separate things were acting on PITCH:
+		  1. the four-point buoyancy, whose whole purpose is to pitch and roll with the wave
+		  2. `AlignOrientation`, which with `PrimaryAxisOnly` corrects pitch AND roll
+		  3. the trim `Torque`, which deliberately pitches the bow up under power
+
+		And the measurements make the choice obvious. Hydrostatic righting from the float geometry alone is
+		120,844 N-stud per DEGREE of heel, rising to 3.4M at 30 degrees; a crew member standing right at the
+		gunwale heels the hull 0.13 degrees. The trim torque is 4,090,732 - sixteen times the AlignOrientation's
+		250,000. So the constraint was not stabilising anything and could not win any argument it entered. It
+		was purely a fight, and it is most of what made the hull feel dead.
+
+		The reference does recommend `AlignOrientation` for keeping a boat level - but that advice pairs with
+		its single-point buoyancy pattern, where nothing else provides righting. With four points, hydrostatics
+		IS the righting mechanism, and it is both stronger and more physical.
+
+		⚠️ KNOWN LIMIT, accepted: past roughly 90 degrees of heel the float points leave the water and
+		hydrostatics loses its lever, so a full capsize is unrecoverable. That is arguably correct for a small
+		craft in The Wall, and capsizing belongs to the storm-damage job as a real failure state rather than
+		being papered over by a constraint here.
 	]]
-	local righting = Instance.new("AlignOrientation")
-	righting.Name = "Righting"
-	righting.Attachment0 = driveAt
-	righting.Mode = Enum.OrientationAlignmentMode.OneAttachment
-	righting.PrimaryAxisOnly = true
-	righting.PrimaryAxis = Vector3.yAxis -- hull's up, toward world up
-	righting.MaxTorque = spec.rightingTorque
-	righting.Responsiveness = 12
-	righting.RigidityEnabled = false -- a hard lock ignores force limits; never for a vehicle
-	righting.Parent = hull
-	state.righting = righting
+	state.righting = nil
+
+	--[[
+		TRIM: the bow-up moment under power, and it has to be an explicit torque.
+
+		Measured: pitch stiffness fore-aft is 1,022,683 N-stud per DEGREE. Applying thrust below the centre of
+		mass - the obvious way to get a bow-up moment - yields at most 68,000, i.e. 0.07 degrees. Invisible. No
+		arrangement of a 34,000 N thrust against a hull this stiff will lift the bow.
+
+		That is a missing phenomenon rather than a failed approach: a real hull rises because of HYDRODYNAMIC
+		lift at the stern as speed builds, and nothing here simulates that. So it is modelled directly.
+
+		`RelativeTo = Attachment0` so the axis follows the hull - a bow-up torque must stay bow-up as she
+		turns, which a world-relative torque would not.
+	]]
+	local trim = Instance.new("Torque")
+	trim.Name = "Trim"
+	trim.Attachment0 = driveAt
+	trim.RelativeTo = Enum.ActuatorRelativeTo.Attachment0
+	trim.Torque = Vector3.zero
+	trim.Parent = hull
+	state.trim = trim
 
 	--[[
 		Yaw. `RelativeTo = World` about Y, so momentum carries the hull through a turn and it drifts rather
@@ -171,62 +218,106 @@ local function buildVessel()
 	yaw.Name = "Yaw"
 	yaw.Attachment0 = driveAt
 	yaw.RelativeTo = Enum.ActuatorRelativeTo.World
-	yaw.MaxTorque = spec.rightingTorque * 0.35
+	--[[
+		🔴 ITS OWN NUMBER, not derived from the righting torque.
+
+		It was `rightingTorque * 0.35`. When the righting torque was cut from 900,000 to 250,000 - for entirely
+		unrelated reasons, to stop the hull feeling locked flat - the steering silently went from 315,000 to
+		87,500 and the boat stopped answering the wheel.
+
+		Measured: the hull's moment of inertia about Y is 628,600, and reaching the spec's 0.55 rad/s in two
+		seconds needs 172,865. 87,500 was not enough to turn it at all.
+
+		Two unrelated feel dials must never share one number.
+	]]
+	yaw.MaxTorque = spec.yawTorque
 	yaw.AngularVelocity = Vector3.zero
 	yaw.ReactionTorqueEnabled = false
 	yaw.Parent = hull
 	state.yaw = yaw
 
 	--[[
-		THE HELM SEAT.
+		🔴 THE HELM IS A STATION YOU STAND AT, NOT A SEAT YOU SIT IN. THIS IS THE SECOND REWRITE.
 
-		🔴 A plain `Seat`, NOT a `VehicleSeat` (decision 0022).
+		The first version welded a `Seat` into the hull. Sitting in it DESTROYED THE BOAT, every time:
 
-		`VehicleSeat` would hand throttle and steering to us for free, and on mobile it would supply the touch
-		controls too. It also hands NETWORK OWNERSHIP to the driver on sit - which is exactly the condition
-		that makes a server-side buoyancy loop pump energy instead of removing it, and is why the Jungle boat
-		bounced higher and higher while driven. So we take the plain seat and build the input ourselves.
+		    [VESSEL] johnygorsky10 took the helm
+		    [VESSEL] hull ownership was taken by a client and has been reclaimed
+		    [VESSEL] hull was LOST (removed by the engine) - rebuilding
 
-		WELDED, never anchored. Anchoring any part of an assembly splits it and disables its welds. `Massless`
-		so a seat bolted high on the deck cannot shift the centre of mass and make the hull list.
+		Sitting welds the character into the hull's assembly. Roblox then hands that assembly to the sitting
+		player's client, because it contains their character - and `enforceOwnership` yanked it straight back,
+		every single frame. A per-frame ownership tug-of-war over a body containing a client-simulated
+		character tears it apart.
+
+		The physics guidance says a per-frame re-grab "settles instantly and does not thrash", and that is true
+		for a `VehicleSeat` which hands over ONCE. A seated character keeps asking, so it never settles.
+
+		A `ProximityPrompt` on the helm avoids the whole problem: the driver stays their own assembly, standing
+		on a moving platform - which already works, and which is how every other crew station in this game will
+		have to work anyway, because you do not "sit" at a radar screen. The hull stays server-owned with
+		nothing to fight over.
 	]]
 	local helmSocket = (hull:FindFirstChild("Sockets") :: Folder):FindFirstChild("helm") :: Attachment
-	local seat = Instance.new("Seat")
-	seat.Name = "Helm"
-	seat.Size = Vector3.new(2, 1, 2)
-	seat.CFrame = hull.CFrame * CFrame.new(helmSocket.Position + Vector3.new(0, 0.5, 0))
-	seat.Anchored = false
-	seat.CanCollide = false -- crew walk through it rather than tripping over it
-	seat.Massless = true
-	seat.Material = Enum.Material.Metal
-	seat.Color = Color3.fromRGB(46, 70, 88)
-	seat.Parent = model
+	local console = Instance.new("Part")
+	console.Name = "HelmConsole"
+	console.Size = Vector3.new(3, 3, 1.5)
+	console.CFrame = hull.CFrame * CFrame.new(helmSocket.Position + Vector3.new(0, 1.5, 0))
+	console.Anchored = false
+	console.CanCollide = false -- crew walk through it rather than tripping over it in a storm
+	console.Massless = true -- must not shift the centre of mass and make the hull list
+	console.Material = Enum.Material.Metal
+	console.Color = Color3.fromRGB(46, 70, 88)
+	console.Parent = model
 
 	local weld = Instance.new("WeldConstraint")
 	weld.Part0 = hull
-	weld.Part1 = seat
-	weld.Parent = seat
-	state.seat = seat
+	weld.Part1 = console
+	weld.Parent = console
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "TakeHelm"
+	prompt.ActionText = "Take the helm"
+	prompt.ObjectText = spec.name
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 12
+	prompt.RequiresLineOfSight = false -- a wheelhouse wall should not stop you reaching the wheel
+	prompt.Parent = console
+	state.console = console
+	state.prompt = prompt
 
 	--[[
-		Track the occupant, and accept input from nobody else.
-
-		Cheap server-side authority: the remote arrives from a client, so without this any player could steer
-		the vessel from anywhere on the map. Checking the seat rather than a flag means it cannot get out of
-		sync with who is actually sitting there.
+		Toggle: the same prompt takes and releases the helm, so there is never a state where the player is
+		steering and cannot work out how to stop.
 	]]
-	seat:GetPropertyChangedSignal("Occupant"):Connect(function()
-		local occupant = seat.Occupant
-		local player = occupant and Players:GetPlayerFromCharacter(occupant.Parent)
-		state.driver = player
-		if not player then
-			-- releasing the helm must not leave the throttle open
-			state.throttle, state.steer = 0, 0
-			print("[VESSEL] helm released")
-		else
-			print(("[VESSEL] %s took the helm"):format(player.Name))
+	prompt.Triggered:Connect(function(player)
+		if state.driver == player then
+			state.driver = nil
+			state.throttle, state.steer = 0, 0 -- releasing must not leave the throttle open
+			prompt.ActionText = "Take the helm"
+			workspace:SetAttribute("VesselDriver", "")
+			print(("[VESSEL] %s released the helm"):format(player.Name))
+			return
 		end
-		workspace:SetAttribute("VesselDriver", player and player.Name or "")
+		if state.driver then
+			return -- someone else has it; one helm, one driver
+		end
+		state.driver = player
+		prompt.ActionText = "Release the helm"
+		workspace:SetAttribute("VesselDriver", player.Name)
+		print(("[VESSEL] %s took the helm"):format(player.Name))
+	end)
+
+	--[[
+		Walking away, dying or leaving must all release it, or the vessel is stuck under the command of
+		somebody who is not there. Distance is checked in the main step.
+	]]
+	Players.PlayerRemoving:Connect(function(player)
+		if state.driver == player then
+			state.driver = nil
+			state.throttle, state.steer = 0, 0
+			workspace:SetAttribute("VesselDriver", "")
+		end
 	end)
 
 	print(("[VESSEL] %s built. mass %.0f, %d float points, K %.0f, D %.0f, drag %.1f, equilibrium %.4f")
@@ -336,15 +427,75 @@ local function step(dt: number)
 		entry.force.Force = Vector3.new(0, f, 0)
 	end
 
+	--[[
+		TEST-DRIVE HOOK.
+
+		Exists so this can be driven and measured WITHOUT a human at the helm - and it is a Workspace attribute
+		rather than a `_G` entry because `_G` is not shared between the running server scripts and an
+		`execute_luau` probe (they are separate Luau VMs). Attributes live on the Instance, so both see them.
+
+		The driver's own input is ignored while it is set, so the two cannot fight. Harmless in production: it
+		does nothing unless somebody with Studio access sets the attribute.
+	]]
+	if workspace:GetAttribute("VesselTestDrive") == true then
+		local t = workspace:GetAttribute("VesselTestThrottle")
+		local st = workspace:GetAttribute("VesselTestSteer")
+		state.throttle = if typeof(t) == "number" then math.clamp(t, -1, 1) else 0
+		state.steer = if typeof(st) == "number" then math.clamp(st, -1, 1) else 0
+	end
+
 	-- DRIVE
 	local forward = hull.CFrame.LookVector
 	local forwardSpeed = hull.AssemblyLinearVelocity:Dot(forward)
 	local hasFuel = state.fuel > 0 and state.engineOn
 	local throttle = if hasFuel then state.throttle else 0
-	local net = VesselPhysics.driveForce(throttle, forwardSpeed, state.spec.thrust, state.drag)
+	local net = VesselPhysics.driveForce(throttle, forwardSpeed, state.spec.thrust, state.drag, state.linearDrag)
 	if state.drive then
-		-- Attachment0-relative, so +Z is the hull's own forward
-		state.drive.Force = Vector3.new(0, 0, net)
+		--[[
+			Aimed along the actual heading, and CAPPED.
+
+			The cap is a safety net rather than a tuning device: drag already settles the hull at `cruise`, so
+			this only ever engages if something has gone wrong. It engages BEFORE the speed becomes lethal,
+			which is the lesson from the runaway above - a vehicle should not be able to kill its driver
+			through a sign error.
+		]]
+		local overspeed = forwardSpeed > state.spec.cruise * 1.6
+		state.drive.Force = forward * (if overspeed then math.min(net, 0) else net)
+	end
+
+	--[[
+		TRIM. Positive X torque pitches the bow UP (hull +Z is forward, +X is starboard, so a positive moment
+		about X lifts the nose).
+
+		Scaled by throttle so she settles bow-up under power and levels off when the throttle closes - and only
+		forward throttle, because backing down should squat the stern, not lift it.
+	]]
+	if state.trim then
+		local t = math.max(throttle, 0)
+		state.trim.Torque = Vector3.new(state.spec.trimTorque * t, 0, 0)
+	end
+
+	--[[
+		Release the helm if the driver has wandered off, died, or lost their character. Otherwise the vessel
+		stays under the command of somebody who is not there, with the throttle where they left it.
+	]]
+	if state.driver then
+		local character = state.driver.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		local gone = not root
+			or (humanoid and humanoid.Health <= 0)
+			or (state.console and (root :: BasePart).Position:FuzzyEq((root :: BasePart).Position) and
+				((root :: BasePart).Position - state.console.Position).Magnitude > 40)
+		if gone then
+			print(("[VESSEL] helm released - %s is no longer at it"):format(state.driver.Name))
+			state.driver = nil
+			state.throttle, state.steer = 0, 0
+			if state.prompt then
+				state.prompt.ActionText = "Take the helm"
+			end
+			workspace:SetAttribute("VesselDriver", "")
+		end
 	end
 
 	-- STEER

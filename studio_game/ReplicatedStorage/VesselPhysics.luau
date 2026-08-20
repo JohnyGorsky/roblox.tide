@@ -202,8 +202,27 @@ end
 	Deriving it means `cruise` in the spec is a PROMISE the physics keeps, not a hope. Change the number and
 	the boat actually settles there.
 ]]
+--[[
+	Fraction of the drag at cruise that is LINEAR rather than quadratic.
+
+	Pure quadratic drag decays asymptotically, so the hull never actually stops - simulated, she took 78
+	seconds to come to rest from cruise, spending most of it crawling. That is not "a boat glides", it is a
+	boat that will not park.
+
+	Real water resistance has both terms: quadratic (form drag) dominates at speed, linear (viscous) at low
+	speed. Splitting them makes the coast finite without touching the top speed, because both are derived so
+	their SUM equals thrust exactly at cruise.
+]]
+VesselPhysics.LINEAR_DRAG_SHARE = 0.25
+
+--- Quadratic coefficient. Carries `1 - LINEAR_DRAG_SHARE` of the drag at cruise.
 function VesselPhysics.dragCoefficient(thrust: number, cruise: number): number
-	return thrust / math.max(cruise * cruise, 0.01)
+	return (1 - VesselPhysics.LINEAR_DRAG_SHARE) * thrust / math.max(cruise * cruise, 0.01)
+end
+
+--- Linear coefficient. Carries the rest, and is what actually brings her to a stop.
+function VesselPhysics.linearDrag(thrust: number, cruise: number): number
+	return VesselPhysics.LINEAR_DRAG_SHARE * thrust / math.max(cruise, 0.01)
 end
 
 --[[
@@ -218,11 +237,24 @@ end
 ]]
 VesselPhysics.REVERSE_FRACTION = 0.4
 
-function VesselPhysics.driveForce(throttle: number, forwardSpeed: number, thrust: number, drag: number): number
+function VesselPhysics.driveForce(
+	throttle: number,
+	forwardSpeed: number,
+	thrust: number,
+	drag: number,
+	linear: number?
+): number
 	local t = math.clamp(throttle, -1, 1)
 	local applied = if t >= 0 then t * thrust else t * thrust * VesselPhysics.REVERSE_FRACTION
-	-- drag always opposes motion, and scales with the square of speed
-	local resist = -math.sign(forwardSpeed) * drag * forwardSpeed * forwardSpeed
+	--[[
+		Drag always opposes MOTION, never the throttle. That is what makes releasing the throttle a coast
+		rather than a brake, and it is most of what will make a heavier hull feel heavy later.
+
+		Two terms: quadratic dominates at speed, linear brings her to an actual stop.
+	]]
+	local speed = math.abs(forwardSpeed)
+	local lin = linear or 0
+	local resist = -math.sign(forwardSpeed) * (drag * speed * speed + lin * speed)
 	return applied + resist
 end
 
@@ -243,7 +275,18 @@ end
 function VesselPhysics.yawRate(steer: number, forwardSpeed: number, cruise: number, turnRate: number): number
 	local s = math.clamp(steer, -1, 1)
 	local speed = math.abs(forwardSpeed)
-	local rampIn = math.min(speed / math.max(cruise, 0.01), 1)
+	--[[
+		🔴 SUB-LINEAR, and this is what makes the turn read as a boat.
+
+		With a LINEAR ramp, yaw rate is proportional to speed - so turn radius (speed / rate) is CONSTANT.
+		Measured 33 studs at every speed from 5 to 18, which is under one boat length and identical whether
+		crawling or flat out. The boat system doc asks for the opposite: "wider turns at high speed".
+
+		Raising the ratio to a power below 1 makes rate grow slower than speed, so the radius WIDENS as she
+		gains way - while still leaving almost no authority at rest, because a rudder needs water moving past
+		it. 0.65 gives roughly 32 studs of radius at a crawl and 60 at cruise.
+	]]
+	local rampIn = math.min(speed / math.max(cruise, 0.01), 1) ^ 0.65
 	-- above cruise, authority bleeds off - fast means committed
 	local excess = math.max(speed - cruise, 0) / math.max(cruise, 0.01)
 	local bleed = 1 / (1 + excess * 0.8)

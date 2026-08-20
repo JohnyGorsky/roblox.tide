@@ -79,8 +79,12 @@ export type Spec = {
 	cruise: number,
 	--- Radians/second of yaw at full steer, at cruise.
 	turnRate: number,
-	--- How hard it resists heeling. THE feel dial (decision 0022).
+	--- Torque available to turn her. MUST be its own number - see the note in the spec.
+	yawTorque: number,
+	--- Backstop against a knockdown. NOT the righting mechanism - buoyancy geometry is (see the spec).
 	rightingTorque: number,
+	--- Bow-up moment at full throttle. Models hydrodynamic trim, which nothing else here simulates.
+	trimTorque: number,
 	fuelCapacity: number,
 	--- Litres-ish per second at full throttle.
 	fuelBurn: number,
@@ -139,16 +143,57 @@ local STARTER_LAUNCH: Spec = {
 	]]
 	thrust = 34000,
 	cruise = 18,
-	turnRate = 0.55,
 	--[[
-		Righting torque. THE dial that decides whether this feels like a boat or a bathtub toy.
+		Yaw rate at full steer at cruise. Cut from 0.55 after measuring the turn radius it implied.
 
-		Deliberately touches the same axes the four-point buoyancy does, which the physics guidance warns
-		about - accepted with open eyes, because no righting moment means capsizing from a crew member
-		walking the deck, and a hard orientation lock means the sea does nothing. Tune against Choppy AND
-		The Wall, never against Light Swell.
+		0.55 rad/s at cruise 18 is a 33-stud radius - under ONE boat length, which is a jet-ski rather than a
+		launch. Real small craft turn in roughly two to three lengths. 0.30 gives a 60-stud radius at cruise,
+		about 1.5 lengths: still responsive for a game, but she has to be steered rather than flicked.
 	]]
-	rightingTorque = 900000,
+	turnRate = 0.30,
+	--[[
+		Yaw torque. Its own number, deliberately.
+
+		It used to be derived as `rightingTorque * 0.35`, and when the righting was softened for unrelated
+		reasons the steering silently died with it - 315,000 became 87,500 and she stopped answering the wheel.
+
+		Sized from measurement rather than taste: the hull's moment of inertia about Y is 628,600, so reaching
+		0.55 rad/s in two seconds needs 172,865. 600,000 gives enough authority to overcome water resistance
+		and still feel like a rudder rather than a thruster.
+	]]
+	yawTorque = 600000,
+	--[[
+		Righting torque - a BACKSTOP, not the righting mechanism. Cut from 900,000 after measuring.
+
+		The four-point buoyancy already provides real hydrostatic righting, and it is far stiffer than I
+		assumed: measured 120,844 N-stud per DEGREE of heel, rising to 3.4M at 30 degrees. For scale, a crew
+		member standing right at the gunwale heels the hull by 0.13 degrees. So the capsize-from-avatar-movement
+		risk the boat system doc worried about simply does not exist on this hull.
+
+		Which means the original 900,000 was not stabilising anything - it was pure deadness laid on top of a
+		hull that was already stiff, and it is most of why the boat "did not feel like a boat".
+
+		250,000 is roughly two degrees' worth of buoyancy's own authority: invisible in normal seas, and still
+		enough to help recover from a genuine knockdown where the float points have left the water and
+		hydrostatics has lost its lever.
+	]]
+	rightingTorque = 250000,
+	--[[
+		BOW RISE UNDER POWER, and it has to be modelled explicitly rather than left to emerge.
+
+		Measured: pitch stiffness fore-aft is 1,022,683 N-stud per degree. Applying thrust below the centre of
+		mass - the intuitive way to get a bow-up moment - gives at most 68,000, which is 0.07 degrees. Utterly
+		invisible. No arrangement of a 34,000 N thrust and a hull this stiff will lift the bow.
+
+		That is not a failure of the approach, it is a missing phenomenon: a real hull rises because of
+		HYDRODYNAMIC lift at the stern as it gains speed, which nothing here simulates. So the trim is applied
+		as a deliberate torque scaled by throttle - modelling the effect directly instead of hoping a static
+		lever arm produces it.
+
+		4 degrees at full ahead: enough to see and to feel, not enough to look like a speedboat popping a
+		wheelie.
+	]]
+	trimTorque = 4 * 1022683,
 	fuelCapacity = 100,
 	fuelBurn = 0.55,
 	--[[
