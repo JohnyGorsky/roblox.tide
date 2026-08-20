@@ -1,6 +1,7 @@
 ---
 id: GAME-0010
 name: Shipyard Parts Progression
+area: lobby
 status: PLANNED
 priority: P1
 last_verified: null

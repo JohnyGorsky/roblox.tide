@@ -1,6 +1,7 @@
 ---
 id: GAME-0001
 name: Boat Controller
+area: boat
 status: PLANNED
 priority: P0
 last_verified: null

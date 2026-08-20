@@ -1,6 +1,7 @@
 ---
 id: GAME-0002
 name: Radar Mk1
+area: navigation
 status: PLANNED
 priority: P0
 last_verified: null

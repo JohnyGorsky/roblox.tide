@@ -1,6 +1,7 @@
 ---
 id: GAME-XXXX
 name:
+area:          # sea | boat | atmosphere | islands | lobby | navigation | combat | crew | character | audio | ui
 status: IDEA
 priority: P2
 depends_on: []

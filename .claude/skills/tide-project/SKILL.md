@@ -86,6 +86,8 @@ why: [decision 0013](../../../docs/decisions/0013-two-places-lobby-and-game.md).
 ## Where to read (start here)
 
 1. [docs/INDEX.md](../../../docs/INDEX.md) — the map of everything below.
+   For "what do we build next?" go straight to the **[build manifest](../../../docs/build/README.md)**
+   (12 groups, ~600 items) and the generated **[BUILD-STATUS.md](../../../BUILD-STATUS.md)** board.
 2. [docs/game/vision.md](../../../docs/game/vision.md) and
    [core-loop.md](../../../docs/game/core-loop.md) — what the game is and how a session feels.
 3. The relevant `docs/systems/<system>/README.md` — how that system is *intended* to work now.
@@ -101,6 +103,8 @@ why: [decision 0013](../../../docs/decisions/0013-two-places-lobby-and-game.md).
 | Why an important choice was made (13 accepted) | `docs/decisions/` |
 | Compact catalogs — enemies, weapons, vessels, islands, loot, events, encounters, upgrades, parts, crew | `docs/content/` |
 | The two places and what lives in each | [systems/places/README.md](../../../docs/systems/places/README.md) |
+| **What must be built, and how much of it** | [build/README.md](../../../docs/build/README.md) + [BUILD-STATUS.md](../../../BUILD-STATUS.md) (generated) |
+| Graybox placeholders (what stands in for what) | [assets/README.md](../../../assets/README.md) + `tools/audit-graybox.luau` |
 | Place settings spec (the `.rbxl` is invisible to git) | [systems/places/settings-baseline.md](../../../docs/systems/places/settings-baseline.md) |
 | Sequencing and release scope | `docs/roadmap/` (start with [poc.md](../../../docs/roadmap/poc.md)) |
 | Asset status | [assets/registry/assets.yaml](../../../assets/registry/assets.yaml) |

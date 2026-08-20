@@ -1,5 +1,12 @@
 # Documentation Index
 
+## What to build, and where it stands
+
+- **[The build manifest](build/README.md)** — everything that has to be made, in 12 groups sized to take
+  one at a time. Start here when asking "what do we build next?"
+- **[BUILD-STATUS.md](../BUILD-STATUS.md)** — generated board: every feature by area, asset and graybox
+  counts, delivered jobs. Never edit it; run `python tools/build-status.py`.
+
 ## Read first
 
 - [Game vision](game/vision.md)

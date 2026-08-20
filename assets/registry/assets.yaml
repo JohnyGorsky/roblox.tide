@@ -62,3 +62,23 @@ assets:
   place_notes: Performs tasks in game; shown in the lobby crew roster.
   feature: GAME-0009
   notes: Needs repair, carry, idle, walk/run and interaction animations.
+- id: ASSET-SKY-OVERCAST
+  type: skybox
+  status: IDEA
+  source: store
+  roblox_path: Lighting.Sky
+  place: game
+  place_notes: Blocks the cold-ocean look; see docs/build/01-sea.md finding 1.
+  feature: GAME-0011
+  notes: Overcast/storm skybox set. PROVEN BLOCKER - job 007 established that neither Fog nor
+    Atmosphere can make Roblox's clear-day sky overcast, so the art direction cannot be reached
+    without this. Need at least 3 (overcast day, storm, night); ideally one per sea stage (7).
+    The default tropical Sky is parked in ServerStorage as Sky_DefaultTropical_PARKED.
+- id: ASSET-SEABED-SAND
+  type: terrain
+  status: IMPLEMENTED
+  source: studio
+  roblox_path: Workspace.Terrain
+  place: game
+  feature: GAME-0011
+  notes: Sand seabed -64..-56 with water -56..0 over 6144x6144 studs. Verified by voxel read-back.

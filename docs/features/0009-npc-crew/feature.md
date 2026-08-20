@@ -1,6 +1,7 @@
 ---
 id: GAME-0009
 name: NPC Crew Foundation
+area: crew
 status: PLANNED
 priority: P1
 last_verified: null

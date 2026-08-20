@@ -1,6 +1,7 @@
 ---
 id: GAME-0004
 name: Day / Dusk / Night
+area: atmosphere
 status: PLANNED
 priority: P0
 last_verified: null

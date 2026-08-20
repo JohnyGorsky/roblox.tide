@@ -1,6 +1,7 @@
 ---
 id: GAME-0008
 name: Vessel Class Foundation
+area: boat
 status: PLANNED
 priority: P1
 last_verified: null

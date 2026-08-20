@@ -1,6 +1,7 @@
 ---
 id: GAME-0006
 name: Basic Combat
+area: combat
 status: PLANNED
 priority: P0
 last_verified: null

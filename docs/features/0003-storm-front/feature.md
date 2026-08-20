@@ -1,6 +1,7 @@
 ---
 id: GAME-0003
 name: Advancing Storm Front
+area: atmosphere
 status: PLANNED
 priority: P0
 last_verified: null

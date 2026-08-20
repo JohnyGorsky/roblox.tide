@@ -1,6 +1,7 @@
 ---
 id: GAME-0005
 name: Curated Island Library
+area: islands
 status: PLANNED
 priority: P0
 last_verified: null
