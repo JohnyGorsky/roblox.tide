@@ -169,6 +169,59 @@ end
 -- Startup
 -- ---------------------------------------------------------------------------
 
+--[[
+	AUTO-SPAWN ADMINS ON JOIN.
+
+	This place runs `CharacterAutoLoads = false` deliberately (job 004): *the expedition owns death* - nothing
+	may respawn behind the run's back, or a downed player pops back up mid-revive. That property is worth
+	keeping, so it is NOT being flipped.
+
+	But it governs RESPAWN, and giving a developer a body on join is a different thing entirely. Without this,
+	pressing Play as a developer produces a camera floating over the sea and a trip to the panel before any
+	testing can start - and you cannot test a boat without someone to stand on it.
+
+	So: admins only, once, on join. A non-admin is untouched and still gets no body, which is correct until
+	the real game spawns crew onto a vessel. Death still respawns nobody, for anyone.
+]]
+local function autoSpawnAdmin(player: Player)
+	if not AdminAllowlist.isAdmin(player) then
+		return
+	end
+	local ok, err = pcall(function()
+		player:LoadCharacter()
+	end)
+	if not ok then
+		warn(("%s auto-spawn failed for %s: %s"):format(LOG_PREFIX, player.Name, tostring(err)))
+		return
+	end
+	--[[
+		Put them somewhere standable. The vessel's deck if it exists, otherwise the observation deck - which
+		is exactly the order of preference as the boat replaces the graybox.
+
+		Waits for the character's root because `LoadCharacter` returns before the model is fully assembled,
+		and moving a nil root silently does nothing.
+	]]
+	task.defer(function()
+		local character = player.Character
+		local root = character and character:WaitForChild("HumanoidRootPart", 5)
+		if not root or not root:IsA("BasePart") then
+			return
+		end
+		local vessel = workspace:FindFirstChild("StarterLaunch")
+		local deck = (vessel and vessel.PrimaryPart) or workspace:FindFirstChild("GB_ObservationDeck")
+		if deck and deck:IsA("BasePart") then
+			root.CFrame = CFrame.new(deck.Position + Vector3.new(0, deck.Size.Y / 2 + 4, 0))
+			print(("%s auto-spawned %s on %s"):format(LOG_PREFIX, player.Name, deck:GetFullName()))
+		end
+	end)
+end
+
+Players.PlayerAdded:Connect(autoSpawnAdmin)
+-- and anyone already in, which is the normal case when a script recompiles mid-session
+for _, player in ipairs(Players:GetPlayers()) do
+	task.spawn(autoSpawnAdmin, player)
+end
+
 local toolsOk, toolsMsg = AdminTools.validate()
 if not toolsOk then
 	-- A tool with no declared scope is a bug that must be loud, not guessed around.

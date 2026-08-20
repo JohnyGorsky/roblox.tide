@@ -756,6 +756,139 @@ tools.lightningStrike = {
 }
 
 --[[
+	VESSEL. Server-side, because the hull is server-owned by design (decision 0022) and `_G.TideVessel` only
+	exists there. A client-side handler would find nothing, which is the trap finding 0017 records.
+]]
+local function vessel()
+	return (_G :: any).TideVessel
+end
+
+tools.vesselStatus = {
+	id = "vesselStatus",
+	label = "Vessel status",
+	section = "Vessel",
+	scope = "local",
+	controls = { kind = "button", output = "text" },
+	run = function(_player: Player, _args: any)
+		local V = vessel()
+		if not V then return false, "no vessel - is the game in Play?" end
+		return true, V.report()
+	end,
+}
+
+--[[
+	🔴 THE TEST THAT MATTERS MOST, and the reason it is a tool rather than something I run.
+
+	A spring-damper fails by GAINING energy, and that looks completely fine for ten seconds before it throws
+	the boat off the map. The Jungle boat was rock-stable at rest and bounced higher and higher once driven.
+
+	So this samples the hull's height over time and compares the bob amplitude in the first third against the
+	last third. Growing = the damping is wrong (almost certainly damping computed inside the up-only clamp,
+	where it vanishes exactly when the hull rises). Shrinking or flat = it converges.
+
+	Judging this by eye is not possible, which is why it is measured.
+]]
+tools.vesselStability = {
+	id = "vesselStability",
+	label = "Buoyancy stability check",
+	section = "Vessel",
+	scope = "local",
+	controls = { kind = "choice", options = { "20 seconds", "60 seconds" } },
+	run = function(_player: Player, args: any)
+		local V = vessel()
+		if not V then return false, "no vessel - is the game in Play?" end
+		local hull = V.state.hull
+		if not hull then return false, "no hull" end
+		local seconds = tostring(args and args.value):find("60") and 60 or 20
+
+		local samples = {}
+		local t0 = os.clock()
+		while os.clock() - t0 < seconds do
+			table.insert(samples, hull.Position.Y)
+			task.wait(0.1)
+		end
+		if #samples < 30 then return false, "too few samples" end
+
+		--[[
+			Amplitude as peak-to-trough within a window, compared first third against last third. Comparing
+			means would miss the failure entirely - a boat oscillating +/-1 and one oscillating +/-8 can share
+			the same average height.
+		]]
+		local function amplitude(from: number, to: number): (number, number)
+			local lo, hi, sum = math.huge, -math.huge, 0
+			for i = from, to do
+				lo = math.min(lo, samples[i]); hi = math.max(hi, samples[i]); sum += samples[i]
+			end
+			return hi - lo, sum / (to - from + 1)
+		end
+		local third = math.floor(#samples / 3)
+		local firstAmp, firstMean = amplitude(1, third)
+		local lastAmp, lastMean = amplitude(#samples - third + 1, #samples)
+		local growth = if firstAmp > 0.001 then lastAmp / firstAmp else 0
+
+		local verdict
+		if growth > 1.25 then
+			verdict = "🔴 GROWING - energy is being ADDED. Check that damping is applied OUTSIDE the up-only clamp."
+		elseif growth > 1.05 then
+			verdict = "⚠️ slightly growing - watch it over 60s before trusting it"
+		else
+			verdict = "✅ converging or steady"
+		end
+
+		local spec = V.state.spec
+		return true, table.concat({
+			("sampled %ds, %d points, sea %s"):format(seconds, #samples, tostring(workspace:GetAttribute("SeaState"))),
+			("bob amplitude   first third %.3f  ->  last third %.3f"):format(firstAmp, lastAmp),
+			("mean height     first third %.3f  ->  last third %.3f  (resting %.2f)"):format(
+				firstMean, lastMean, spec and require(ReplicatedStorage.Vessel).restingY(spec, 0) or 0),
+			("growth ratio    %.3f"):format(growth),
+			"",
+			verdict,
+		}, "\n")
+	end,
+}
+
+tools.vesselTeleport = {
+	id = "vesselTeleport",
+	label = "Put me on the boat",
+	section = "Vessel",
+	scope = "local",
+	controls = { kind = "button", output = "text" },
+	run = function(player: Player, _args: any)
+		local V = vessel()
+		if not V or not V.state.hull then return false, "no vessel - is the game in Play?" end
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if not root or not root:IsA("BasePart") then
+			return false, "no character - Diagnostics -> Spawn me a character"
+		end
+		local hull = V.state.hull
+		root.CFrame = CFrame.new(hull.Position + Vector3.new(0, hull.Size.Y / 2 + 4, 0))
+		return true, ("on the deck at %s. It is a moving platform, so you should ride it."):format(
+			tostring(hull.Position))
+	end,
+}
+
+tools.vesselFuel = {
+	id = "vesselFuel",
+	label = "Set fuel",
+	section = "Vessel",
+	scope = "global",
+	controls = { kind = "choice", options = { "full", "half", "almost empty", "empty" } },
+	run = function(_player: Player, args: any)
+		local V = vessel()
+		if not V then return false, "no vessel - is the game in Play?" end
+		local spec = V.state.spec
+		local map = { full = 1, half = 0.5, ["almost empty"] = 0.05, empty = 0 }
+		local f = map[tostring(args and args.value)]
+		if f == nil then return false, "unknown amount" end
+		V.setFuel(spec.fuelCapacity * f)
+		return true, ("fuel %.1f/%.0f. At full throttle that is %.0fs of running."):format(
+			V.state.fuel, spec.fuelCapacity, V.state.fuel / spec.fuelBurn)
+	end,
+}
+
+--[[
 	TIME OF DAY.
 
 	`DayNight.jumpTo` has existed since job 016 and was exposed nowhere, so changing the hour meant waiting up
@@ -1136,7 +1269,7 @@ function AdminTools.manifest(): { any }
 		A section not listed here falls to the end alphabetically, so adding one never breaks the sort - it
 		just does not get a considered position until someone gives it one.
 	]]
-	local SECTION_ORDER = { Storm = 1, Weather = 2, Sea = 3, Audio = 4, Diagnostics = 5 }
+	local SECTION_ORDER = { Vessel = 1, Storm = 2, Weather = 3, Sea = 4, Audio = 5, Diagnostics = 6 }
 	table.sort(list, function(a, b)
 		if a.section == b.section then
 			return a.label < b.label

@@ -123,3 +123,13 @@ Freeboard 3 against the wave amplitudes is what makes weather *mean* something:
   second vessel. It does not leave room for twenty floating crates on the same tick.
 - The class ladder in [vessels](../systems/vessels/README.md) inherits all of this: a Trawler is the same
   chassis with different numbers and more sockets, not a new physics implementation.
+- **Buoyancy stiffness is DERIVED from mass and draft, never authored per hull** — `K = mass × g / (draft ×
+  points)`. This is what makes the kit real rather than nominal: the moment a bigger vessel needs its float
+  hand-tuned, decision 0009's promise is broken and we have one boat with six copies. Each vessel declares
+  how deep it should *sit*, which is a design statement from a reference photo, and the physics follows.
+- **Buoyancy point COUNT comes from the spec too, not fixed at four.** Four suits a 40-stud launch; four on a
+  200-stud hull makes it a rigid plank, because a long vessel must feel the wave along its length. Six to
+  eight there.
+- The abstraction is not total, and the limit is worth stating: a very large vessel with interiors and
+  multiple decks is a different physics problem, and a 200-stud rigid body carrying six players is not
+  obviously the same one. The kit covers **launch through cutter**; the expedition ship needs revisiting.

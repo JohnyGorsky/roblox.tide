@@ -59,13 +59,62 @@ time to arrival, stationary  =  START_DISTANCE / ADVANCE_RATE   (unchanged by an
 | 18 studs/s | 1.06 | working launch |
 | 24 studs/s | 0.80 | fast launch, ~13 kn |
 
+⚠️ **The launch must leave headroom for the classes above it.** Larger vessels are *slower to accelerate and
+faster once going* (see [vessels](../../docs/systems/vessels/README.md)), so if the launch ships at 24 the
+ladder compresses into nothing. It wants ~60-70% of the eventual maximum: **cruise 18**, light and twitchy.
+Acceleration, top speed and turn rate are three independent numbers, and it is *acceleration* that the launch
+should win on - not speed.
+
 So: **pick the cruise speed by feel once the hull moves, then solve `GAIN_PER_STUD` for it.** The 5-minute
 stationary arrival is untouched either way, because it depends only on `START_DISTANCE / ADVANCE_RATE`.
 
 ⚠️ Do not tune this with `TimeScale` set — it scales the front's advance but not the vessel's travel, which
 is exactly the wrong distortion for this measurement (noted in `WorldTick`).
 
-## Four-point buoyancy
+## 🔴 What makes the kit real: nothing is tuned per hull
+
+The whole promise of [decision 0009](../../docs/decisions/0009-vessel-class-architecture.md) is that seven
+vessel classes cost one hull each. That promise is broken the moment a bigger boat needs its buoyancy
+hand-tuned — at that point there is no kit, only one boat and six copies of it.
+
+So **`FLOAT_K` is derived, never authored.** At rest, total lift equals weight:
+
+```text
+K × draft × pointCount  =  mass × gravity          (gravity ≈ 196.2)
+                      ⇓
+K = (mass × 196.2) / (draft × pointCount)
+```
+
+Each vessel therefore declares **how deep it should sit in the water**, which is a design statement anybody
+can make from a reference photo — and the stiffness falls out of it. `FLOAT_D` scales from `K` by the same
+argument. A cutter with twenty times the mass then floats correctly on the first attempt, with the same code
+and no new numbers.
+
+The spec is the *only* thing that varies:
+
+```lua
+StarterLaunch = {
+    size     = Vector3.new(14, 5, 40),
+    mass     = 4200,
+    draft    = 1.8,          -- design statement; K is derived from it
+    buoyancy = { ... },      -- N points, positioned to the hull's shape
+    thrust   = ...,
+    cruise   = ...,
+    sockets  = { helm = ..., engine = ..., radar = ..., hardpoint = { ... } },
+}
+```
+
+⚠️ **Two places this abstraction genuinely stops, named rather than pretended away:**
+
+- **Point count must come from the spec, never be hardcoded at four.** Four points suits a 40-stud launch.
+  Four on a 200-stud vessel makes it a rigid plank, because a long hull must feel the wave *along its
+  length* — that wants six to eight. The algorithm takes `N`.
+- **Very large vessels may need more than one assembly.** Interiors, multiple decks and moving parts are a
+  different physics question, and a 200-stud rigid body carrying six players is not obviously the same
+  problem. The kit will honestly cover launch through cutter; the expedition ship needs revisiting, not
+  assuming.
+
+## Four-point buoyancy *(for this hull — the count comes from the spec)*
 
 ```text
         bow (+Z)
