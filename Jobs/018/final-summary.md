@@ -302,6 +302,12 @@ Lightning.SOUND_STUDS_PER_SECOND 300  legibility, not physics — do not "correc
 ```
 
 ### Open
-- A longer rain recording (6–15 s) would let the voice count drop from 4 to 2
+
+- **The storm cannot hurt you.** The Wall looks unsurvivable and does nothing (decision 0014). This is the
+  single biggest gap and it is what stands between a spectacle and a threat.
+- A longer rain recording (6-15 s) would let the rain voice count drop from 4 to 2
 - `PointLight.Shadows = true` on the camera-local flash light is a mobile tier-down candidate; unmeasured
+- Screen-level rain streaks
+- Non-admin refusal end-to-end test still needs a stable Play session
+
 - Non-admin refusal end-to-end test still needs a stable Play session

@@ -13,7 +13,7 @@
 | | Feature | Id | Status | Pri |
 |---|---|---|---|---|
 | `###..` | [Sea & Sea States](docs/features/0011-sea-states/feature.md) | GAME-0011 | IN_PROGRESS | P0 |
-| `##...` | [Wave Field](docs/features/0014-wave-field/feature.md) | GAME-0014 | READY | P0 |
+| `###..` | [Wave Field](docs/features/0014-wave-field/feature.md) | GAME-0014 | IN_PROGRESS | P0 |
 
 ### boat
 
@@ -26,7 +26,7 @@
 
 | | Feature | Id | Status | Pri |
 |---|---|---|---|---|
-| `###..` | [Advancing Storm Front](docs/features/0003-storm-front/feature.md) | GAME-0003 | IN_PROGRESS | P0 |
+| `####.` | [Advancing Storm Front](docs/features/0003-storm-front/feature.md) | GAME-0003 | IMPLEMENTED | P0 |
 | `###..` | [Day / Dusk / Night](docs/features/0004-day-night/feature.md) | GAME-0004 | IN_PROGRESS | P0 |
 
 ### islands
@@ -77,8 +77,8 @@
 | Status | Features |
 |---|---|
 | PLANNED | 8 |
-| READY | 1 |
 | IN_PROGRESS | 5 |
+| IMPLEMENTED | 1 |
 | **total** | **14** |
 
 ## The build manifest - what actually needs making
@@ -139,6 +139,7 @@ that exist in Studio but were never registered.
 - [x] **016** Day/night cycle with severity-based weather composition
 - [x] **017** Storm core: position, intensity, and the server tick
 - [x] **018** Finish the storm's presence: time scale, lightning, cloud wall, audio
+- [ ] **019** Living-world audio: ambience mixer, ocean beds, storm bed
 
 An unchecked job is still in flight.
 

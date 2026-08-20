@@ -57,18 +57,34 @@ dialog, or restart Studio. It blocks the last two admin checks:
 | Feature | Status | Notes |
 |---|---|---|
 | `GAME-0011` Sea & Sea States | `IN_PROGRESS` | Ocean + harbour built and verified. Five states in `SeaStates.luau`. Skies sourced; look approved |
-| `GAME-0003` Advancing Storm Front | `IN_PROGRESS` | Front advances, world ticks, everyday weather drifts, lightning strikes, cloud wall astern. **Not done: damage when caught** — The Wall only *looks* unsurvivable |
+| `GAME-0003` Advancing Storm Front | `IMPLEMENTED` | Job 018. Front advances, everyday weather drifts, lightning lights the sea at range, cloud wall grows and engulfs, 4-channel audio bed. **Approved by eye for the POC.** Not VERIFIED because the storm still cannot hurt you |
 | `GAME-0004` Day/Night | `IN_PROGRESS` | 575 s cycle. `DayNight.compose()` is the sole writer of Lighting, Terrain water and the cloud layer |
 | `GAME-0012` Admin Panel | `IN_PROGRESS` | Both places. **F4** or **ADM** (bottom-right). **32 tools** in game across Sea / Weather / Storm / Audio / Diagnostics. Gate attack-tested and passed |
 
 ---
 
+## Resuming after a Studio restart (read this first)
+
+Studio was closed on 2026-08-20 with job 018 complete and job 019 open. Nothing is lost — every source file
+is on disk — but two things need checking before trusting what you see:
+
+1. **Re-verify Studio Sync.** [Finding 0007](../findings/0007-reopening-a-place-can-drop-the-studio-sy.md):
+   reopening a place can silently drop the sync connection, so scripts look present while edits go nowhere.
+   Check a known module exists in `ReplicatedStorage` (there should be **12**), and that
+   `ServerScriptService` has **3** and `StarterPlayerScripts` **2**.
+
+2. **The `Clouds` layer is not backed by a file.** It was created over MCP in Edit, so if the place was
+   closed without saving it is gone. This costs nothing — `WorldTick` recreates it on start if missing — but
+   the Edit-mode view will show a clear sky until something runs.
+
+Nothing else in the place is script-generated; the ocean, harbour and spawn are all saved geometry.
+
 ## Waiting on you
 
 | # | What | Why |
 |---|---|---|
-| 1 | **Judge the storm approach** | Panel → Storm → **Watch a full approach (10x)**, then look ASTERN. Everything in job 018 is unjudged by a human |
-| 2 | **Two sound clips** — rain loop, thunder one-shot | Spec + rules in `Assets/registry/audio.md`. Audition them live via Audio → Audition a sound id; no code change needed |
+| 1 | **Commit.** 4+ files uncommitted | Studio Sync is two-way: deleting an instance deletes the FILE. A mid-session commit is what saved `StormVFX` when a cleanup pattern matched it (finding 0015) |
+| 2 | **Decide how the storm hurts you** | Decision 0014 says escapable in 30–60s; nothing implements it. The storm is a spectacle until this exists |
 | 3 | **Unwedge Studio's Play** | Blocks the non-admin refusal check — the only outstanding admin verification |
 | 4 | **finding 0004** — game place is `Fully Open` | A stranger could deep-link into a running expedition |
 | 5 | **finding 0005** — Social Slots on the game place | A friend could drop into a 6-slot crew mid-run |
@@ -80,8 +96,9 @@ dialog, or restart Studio. It blocks the last two admin checks:
 ## Recommended next move
 
 **[02](build/02-boat-parts.md) vessel foundation.** Groups 01 and 07 are now built as far as they can go
-without a deck to stand on: the sea, its states, the wave field, the day/night cycle, everyday weather and
-the storm all exist and all tick. The next thing that changes the game rather than the scene is the hull.
+without a deck to stand on, and the storm was signed off for the POC on 2026-08-20: the sea, its states, the
+wave field, the day/night cycle, everyday weather, lightning, the cloud wall and the audio bed all exist and
+all tick. The next thing that changes the game rather than the scene is the hull.
 
 It also makes the storm's central mechanic real for the first time. `StormFront` buys distance for northward
 travel and there is nothing to travel with, so today the front simply closes — which is exactly what a

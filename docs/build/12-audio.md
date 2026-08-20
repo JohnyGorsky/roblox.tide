@@ -11,6 +11,16 @@ sourcing: Pixabay (per the workspace asset policy) — every asset presented for
 
 ---
 
+> **Direction settled — [decision 0021](../decisions/0021-audio-direction.md), 2026-08-20.**
+> **No music in the POC**, at all: the ocean carries the mood, and if there has never been music then silence
+> is the default state rather than an effect. Every music item below is therefore out of the P0 half.
+> **Pro Sound Effects** (Creator Store, free, verified) is the primary source — chosen because its clips are
+> **long** (30–135 s where most Roblox audio is 2–5), and length is what defeats audible looping.
+> Search it by its own category vocabulary (`Thunder`, `Water - Surf`, `Boats - Bow Wash`); plain-language
+> searches return subway trains.
+>
+> First job: **[019](../../Jobs/019/intake.md)** — ambience mixer, ocean beds, storm bed, and the rain-clip swap.
+
 ## Why this group punches above its weight
 
 A boat at night with the right audio is frightening with almost no visual work. Hull creaks, a distant

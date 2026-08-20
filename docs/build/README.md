@@ -25,6 +25,7 @@ and so nothing waits on something that does not exist yet.
 |---|---|---|---|---|
 | **P0** | [01](01-sea.md) | Sea & horizon | Wave field (`HeightAt`/`NormalAt`) | Ocean built; this is the maths everything floats on. Look **blocked on sky assets** |
 | **P0** | [07](07-atmosphere.md) | Atmosphere & storm | Day/night cycle, then storm core | Judgeable with no boat at all. Defines the *full range* of sea before anything is tuned to it |
+| **P0** | [12](12-audio.md) | Audio *(ambience half)* | Ambience mixer + ocean beds + music that knows when to stop | **Raised to P0 2026-08-20** — the user's call: *"we want game to feel live"*. Most of it needs no vessel, so it lands like group 07 did |
 | **P0** | [02](02-boat-parts.md) | Boat parts | Vessel foundation — hull at real size, floats, steers | Arrives into a finished world, so buoyancy is tuned once against calm *and* The Wall |
 | **P0** | [03](03-items-props.md) | Items & props | Item foundation + run resources | Fuel/scrap/ammo *is* the loop |
 | **P0** | [04](04-islands.md) | Islands & POIs | Template pipeline + the small island | Somewhere to go |
@@ -33,11 +34,10 @@ and so nothing waits on something that does not exist yet.
 | **P0** | [05](05-enemies.md) | Enemies | Foundation + the shark | The first night threat |
 | **P0** | [06](06-weapons.md) | Weapons | The signature trio: MG, harpoon, flare | Something to fight with |
 | **P1** | [08](08-lobby-shipyard.md) | Lobby & shipyard | Persistence foundation | The reason to play a *second* run |
-| **P1** | [12](12-audio.md) | Audio | Foundation + vessel machinery | Cheapest large gain in mood |
 | **P1** | [10](10-crew.md) | NPC crew | Crew foundation (one Engineer) | Makes solo and small parties work |
 | **P2** | [13](13-admin-tools.md) | Admin panel | *gate + sea tools done* | Accelerator; grows with the systems |
 
-**P0 = the POC loop.** These nine are exactly what [roadmap/poc.md](../roadmap/poc.md) needs to answer the
+**P0 = the POC loop.** These ten are exactly what [roadmap/poc.md](../roadmap/poc.md) needs to answer the
 only question that matters yet: *is `explore → dusk → survive → dawn` fun with other people?* Build the
 **first job** of each, not the whole group — group 02 alone is nine jobs.
 
@@ -58,6 +58,24 @@ there is no hull and no system to fault until group 02 exists. So 07 splits:
 | Day/night cycle, storm position and intensity, sea-state coupling, cloud wall, rain, wind, lightning, fog | The caught-by-storm consequence: damage rate, forced faults, the 30–60s escape window |
 
 Tuning that escape window is the last thing to do, not the first.
+
+### Why audio moved into P0, and how it splits
+
+Raised on 2026-08-20 on the user's direction — *"we want game to feel live"*. The manifest already argued
+audio is the cheapest large improvement here; what makes it viable *early* is the same thing that let group
+07 go early: **most of it needs no vessel.** The ocean, wind, weather and storm all exist and tick now, and
+are almost silent — job 018 wired four channels and nothing else. A sea that is visually alive and
+acoustically dead reads as a screensaver.
+
+So group 12 splits on the same line group 07 did:
+
+| Before the boat | Needs the boat | Needs enemies |
+|---|---|---|
+| Ambience mixer, ocean beds per sea state, wind, shore and rock wash, underwater, rigging, sea birds, Dead Calm's wrong-sounding bed, **the music system** | Engine (4 states + catch/fail/shutdown/damaged), hull creak, propeller, generator, pumps | Creature vocalisations, attack and death sets |
+
+Queued as [Planned/0001](../../Planned/0001-living-world-audio.md), which carries the scope and the
+constraints already learned — chiefly that ambient loops are the worst case for audible repetition, and that
+`StormAudio`'s multi-voice / re-seek / detune machinery is proven and should be reused rather than rewritten.
 
 Parallel-safe: **01 + 08** (different places), **03 + 11** (assets vs rigs), **12** with anything.
 

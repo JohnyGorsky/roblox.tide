@@ -2,7 +2,7 @@
 id: GAME-0003
 name: Advancing Storm Front
 area: atmosphere
-status: IN_PROGRESS
+status: IMPLEMENTED
 priority: P0
 last_verified: 2026-08-20
 ---
@@ -47,6 +47,16 @@ Two safety properties, both verified numerically in job 018 and both worth re-ch
    **byte-identical**.
 2. At storm intensity 4 every weather modifier reads exactly `1.0`, so a calm spell can never **mask** an
    approaching front. This is the dangerous one.
+
+## Status note — why IMPLEMENTED and not VERIFIED
+
+Approved by eye for the POC on 2026-08-20: the approach reads, the wall grows and engulfs, lightning lights
+the sea at range, and the audio bed does not loop audibly. Everything sensory is done.
+
+It is **not** VERIFIED because one requirement is genuinely unbuilt: **the storm cannot hurt you.** The Wall
+looks unsurvivable and does nothing at all. Decision 0014 puts damage at escapable-in-30-60s. Until that
+exists the storm is a spectacle rather than a threat, and the macro loop decision 0007 describes does not
+close.
 
 ## Still open
 

@@ -2,7 +2,7 @@
 id: GAME-0014
 name: Wave Field
 area: sea
-status: READY
+status: IN_PROGRESS
 priority: P0
 depends_on: [GAME-0011]
 assets: []
@@ -66,20 +66,20 @@ block.
 
 ## Requirements
 
-- [ ] `WaveField.HeightAt(x, z, t)` → surface Y in studs
-- [ ] `WaveField.NormalAt(x, z, t)` → surface normal, for orienting a hull
+- [x] `WaveField.HeightAt(x, z, t)` → surface Y in studs
+- [x] `WaveField.NormalAt(x, z, t)` → surface normal, for orienting a hull
 - [ ] **Deterministic** — same inputs give the same answer on every client and the server, with no
       replication traffic. Derive time from a **synchronised clock** (`Workspace:GetServerTimeNow()`),
       never from a local `tick()` or per-client accumulator
-- [ ] Driven by the active sea state's `wave` block, so the five states each feel different
-- [ ] Smooth transition when the sea state changes or blends — no instant jump in surface height, which
+- [x] Driven by the active sea state's `wave` block, so the five states each feel different
+- [x] Smooth transition when the sea state changes or blends — no instant jump in surface height, which
       would launch or submerge a floating object
 - [ ] **Calibrated against the visual water** — see below. Per sea state
 - [ ] Cheap enough to sample **8–12 points per frame** (a hull needs several; debris needs one each)
-- [ ] Sensible outside the ocean extent: return `WATER_Y`, never `nan`
-- [ ] Debug visualiser: a grid of markers that sit on the sampled surface, so the maths can be *seen*
+- [x] Sensible outside the ocean extent: return `WATER_Y`, never `nan`
+- [x] Debug visualiser: a grid of markers that sit on the sampled surface, so the maths can be *seen*
       against the rendered water
-- [ ] Admin panel toggle for the visualiser (group 13 already lists it)
+- [x] Admin panel toggle for the visualiser (group 13 already lists it)
 
 ## The calibration step — do not skip this
 
@@ -132,7 +132,7 @@ Whitecaps, spray and wake belong to group 01's surface-detail job, though they w
       apparent distance between crests agree. Point-for-point alignment is not a goal.)*
 - [ ] Switching or blending states moves the surface smoothly
 - [ ] 12 samples per frame cost is measured and acceptable on a phone
-- [ ] Sampling far outside the ocean returns `WATER_Y` and never errors
+- [x] Sampling far outside the ocean returns `WATER_Y` and never errors
 
 ## Verification
 
@@ -148,3 +148,20 @@ present on all five states and interpolated by `lerp`; out-of-bounds returns `WA
 normals vertical in Dead Calm (y = 1.00000) and tilted in The Wall (y = 0.88); measured crest-to-trough
 86–98% of `amplitude × 2`, the shortfall being finite-grid sampling rather than a normalisation error;
 12 `HeightAt` calls cost 0.0126 ms, which is 0.08% of a 60 fps frame.
+
+## Status note — 2026-08-20
+
+`WaveField.luau` is built and in use: `HeightAt`, `NormalAt`, `SurfaceAt`, `SubmersionAt`, `measureRange`,
+plus `WaveFieldDebug` (`showGrid` / `showRuler` / `report`) and panel toggles. State and blend live on
+Workspace attributes so every context agrees, and job 018 added `SeaStates.currentBlended()` so the field,
+the composer and everyday weather share one blend. Everyday weather scales amplitude through a single point
+in `currentWave()`, so height and normals can never disagree.
+
+**Still genuinely open, and all three need the boat or a phone:**
+
+- calibration of the field against the *rendered* water per sea state (the envelope/wavelength match)
+- the 8–12 samples-per-frame cost measured on a real phone
+- server/client agreement measured in a live session rather than reasoned about
+
+Those are why this is not `IMPLEMENTED`. Nothing floats on it yet, so its accuracy has never actually
+mattered — group 02 is what will expose it.
