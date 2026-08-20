@@ -79,8 +79,20 @@ export type Spec = {
 	cruise: number,
 	--- Radians/second of yaw at full steer, at cruise.
 	turnRate: number,
-	--- Torque available to turn her. MUST be its own number - see the note in the spec.
-	yawTorque: number,
+	--[[
+		Seconds for the yaw rate to build once the wheel goes over - the rudder's LAG.
+
+		This is the single most important number for whether she feels like a boat: the old servo-driven yaw
+		snapped to full rate instantly, which read as "rotating on the spot". Rudder authority and yaw damping
+		are both DERIVED from this and the hull's own inertia, so the kit still holds at any size.
+	]]
+	rudderLag: number,
+	--- Seconds to kill sideways motion. THIS is what makes a turn change direction, not just heading.
+	lateralGrip: number,
+	--- Degrees of INWARD heel as the wheel goes over (the transient). Researched: this is the biggest heel.
+	heelInDeg: number,
+	--- Degrees of OUTWARD heel once the turn settles (centrifugal).
+	heelOutDeg: number,
 	--- Backstop against a knockdown. NOT the righting mechanism - buoyancy geometry is (see the spec).
 	rightingTorque: number,
 	--- Bow-up moment at full throttle. Models hydrodynamic trim, which nothing else here simulates.
@@ -152,16 +164,41 @@ local STARTER_LAUNCH: Spec = {
 	]]
 	turnRate = 0.30,
 	--[[
-		Yaw torque. Its own number, deliberately.
+		Rudder lag: how long the yaw rate takes to build after the wheel moves.
 
-		It used to be derived as `rightingTorque * 0.35`, and when the righting was softened for unrelated
-		reasons the steering silently died with it - 315,000 became 87,500 and she stopped answering the wheel.
+		1.3 seconds. A real hull does not begin rotating at its final rate the instant the rudder moves; the
+		flow has to load the foil and overcome the hull's resistance to turning. Removing that lag is what
+		made her feel like she was pivoting on the spot rather than being steered.
 
-		Sized from measurement rather than taste: the hull's moment of inertia about Y is 628,600, so reaching
-		0.55 rad/s in two seconds needs 172,865. 600,000 gives enough authority to overcome water resistance
-		and still feel like a rudder rather than a thruster.
+		Rudder authority and yaw damping are both derived from this plus the hull's moment of inertia, so a
+		cutter with five times the inertia gets five times the numbers and the same feel. Nothing hand-tuned.
 	]]
-	yawTorque = 600000,
+	rudderLag = 1.3,
+	--[[
+		Lateral grip: seconds to kill sideways motion. The keel, in effect.
+
+		Without any lateral resistance the hull turned on the spot and kept travelling in its original
+		direction - crabbing sideways with the nose pointed elsewhere. There was no sideways drag at all.
+
+		0.6 for a working launch: she follows her nose with a little slip through the turn, which is what makes
+		a boat feel like a boat rather than a car. A speedboat would be 0.3, a barge 1.5.
+	]]
+	lateralGrip = 0.6,
+	--[[
+		HEEL IN A TURN, in degrees, from research rather than taste (MARIN; ScienceDirect on heel angle).
+
+		A hull does not lean one way through a turn - it does both, and in this order:
+		  heelInDeg   she flicks INTO the turn as the wheel goes over, before the hull's side force builds.
+		              This is the LARGEST heel of the manoeuvre, which is counter-intuitive and correct.
+		  heelOutDeg  she settles OUTWARD once the rate of turn is established and centrifugal force at the
+		              centre of gravity - above the centre of lateral resistance - takes over.
+
+		4 in, 2.5 out: the flick reads clearly, the settle is a lean you can see on the horizon rather than
+		something that throws the crew about. Both are converted to moments against the measured roll
+		stiffness of 120,844 N-stud per degree.
+	]]
+	heelInDeg = 4.0,
+	heelOutDeg = 2.5,
 	--[[
 		Righting torque - a BACKSTOP, not the righting mechanism. Cut from 900,000 after measuring.
 

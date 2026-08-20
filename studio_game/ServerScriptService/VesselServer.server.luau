@@ -50,13 +50,19 @@ local state = {
 	spec = nil :: any,
 	floats = {} :: { { attachment: Attachment, force: VectorForce } },
 	drive = nil :: VectorForce?,
+	grip = nil :: VectorForce?,
 	righting = nil :: AlignOrientation?,
-	yaw = nil :: AngularVelocity?,
+	rudder = nil :: Torque?,
+	heel = nil :: Torque?,
 	trim = nil :: Torque?,
 	stiffness = 0,
 	damping = 0,
 	drag = 0,
 	linearDrag = 0,
+	yawDamping = 0,
+	rudderAuthority = 0,
+	heelIn = 0,
+	heelOut = 0,
 	maxDepth = 0,
 	console = nil :: BasePart?,
 	prompt = nil :: ProximityPrompt?,
@@ -115,6 +121,30 @@ local function buildVessel()
 		beach ball.
 	]]
 	state.maxDepth = spec.draft * 2.5
+	--[[
+		Rudder authority and yaw damping, DERIVED from the hull's own moment of inertia and the desired lag.
+
+		    inertiaY  = m/12 * (beam^2 + length^2)
+		    damping   = inertiaY / rudderLag        -> sets the time constant
+		    authority = turnRate * damping          -> sets the steady rate that damping settles at
+
+		So a cutter with five times the inertia gets five times both numbers and behaves identically. This is
+		the same principle as deriving buoyancy stiffness from mass and draft: the spec states intent, the
+		physics derives the constants, and nothing is hand-tuned per hull.
+	]]
+	local inertiaY = mass / 12 * (spec.size.X ^ 2 + spec.size.Z ^ 2)
+	state.yawDamping = inertiaY / math.max(spec.rudderLag, 0.1)
+	state.rudderAuthority = spec.turnRate * state.yawDamping
+	--[[
+		Heel moments, converted from DEGREES to torque against the hull's own measured roll stiffness.
+
+		Roll stiffness is `2 * K * lever^2` per radian for the two float points either side, which for this
+		hull is 120,844 N-stud per degree. Deriving it means the spec can say "4 degrees" and mean it.
+	]]
+	local lever = math.abs(spec.buoyancyPoints[1].X)
+	local rollStiffnessPerDeg = 2 * state.stiffness * (lever * math.sin(math.rad(1))) * lever
+	state.heelIn = (spec.heelInDeg * rollStiffnessPerDeg) / math.max(state.rudderAuthority, 1)
+	state.heelOut = (spec.heelOutDeg * rollStiffnessPerDeg) / math.max(spec.turnRate * spec.cruise, 0.01)
 	state.fuel = spec.fuelCapacity
 
 	local restingY = Vessel.restingY(spec, SeaStates.WATER_Y)
@@ -139,7 +169,12 @@ local function buildVessel()
 	-- Thrust, along the hull's heading, through the centre of mass so it does not induce spin.
 	local driveAt = hull:FindFirstChild("Drive") :: Attachment
 	local drive = Instance.new("VectorForce")
-	drive.Name = "Drive"
+	--[[
+		Named distinctly from the `Drive` ATTACHMENT it hangs off. They were both called "Drive", so
+		`hull:FindFirstChild("Drive")` returned whichever came first - and a diagnostic asking for the force
+		got the attachment and errored on `.Force`. Cheap confusion, easily avoided.
+	]]
+	drive.Name = "DriveForce"
 	drive.Attachment0 = driveAt
 	--[[
 		🔴 WORLD-RELATIVE, aimed explicitly along the hull's LookVector every frame.
@@ -160,6 +195,25 @@ local function buildVessel()
 	drive.Force = Vector3.zero
 	drive.Parent = hull
 	state.drive = drive
+
+	--[[
+		LATERAL GRIP - a second force, opposing sideways motion.
+
+		This is the keel. Without it the hull turned on the spot and carried straight on, crabbing sideways
+		with its nose pointed elsewhere, because nothing resisted sideways travel at all.
+
+		Separate from the drive force rather than folded into it, so each force does one thing and can be read
+		off in the Explorer while running. Applied at the centre of mass: a keel force applied aft would also
+		yaw her, and yaw already has an owner.
+	]]
+	local grip = Instance.new("VectorForce")
+	grip.Name = "LateralGrip"
+	grip.Attachment0 = driveAt
+	grip.RelativeTo = Enum.ActuatorRelativeTo.World -- aimed explicitly each frame; no sign conventions
+	grip.ApplyAtCenterOfMass = true
+	grip.Force = Vector3.zero
+	grip.Parent = hull
+	state.grip = grip
 
 --[[
 		🔴 NO AlignOrientation. REMOVED after auditing against the physics reference.
@@ -210,31 +264,40 @@ local function buildVessel()
 	trim.Parent = hull
 	state.trim = trim
 
-	--[[
-		Yaw. `RelativeTo = World` about Y, so momentum carries the hull through a turn and it drifts rather
-		than pivoting - which is what makes it read as a boat. `Attachment0` is explicitly unsupported here.
+--[[
+		🔴 THE RUDDER IS A TORQUE, NOT AN `AngularVelocity`.
+
+		There was an `AngularVelocity` here. It is a SERVO - it drives to a commanded yaw rate, so the hull was
+		already rotating at full rate the instant the wheel moved. No build-up, no lag, no dependence on the
+		hull's own resistance to turning. The rotation was imposed rather than earned, and that is exactly what
+		"it just rotates on the spot" is.
+
+		A `Torque` plus yaw damping gives the balance a real rudder has, and the lag comes free: the time
+		constant is inertia / damping, so the yaw builds over about a second.
+
+		`RelativeTo = World` about Y, so momentum carries her through the turn - the drift is real, not scripted.
 	]]
-	local yaw = Instance.new("AngularVelocity")
-	yaw.Name = "Yaw"
-	yaw.Attachment0 = driveAt
-	yaw.RelativeTo = Enum.ActuatorRelativeTo.World
+	local rudder = Instance.new("Torque")
+	rudder.Name = "Rudder"
+	rudder.Attachment0 = driveAt
+	rudder.RelativeTo = Enum.ActuatorRelativeTo.World
+	rudder.Torque = Vector3.zero
+	rudder.Parent = hull
+	state.rudder = rudder
+
 	--[[
-		🔴 ITS OWN NUMBER, not derived from the righting torque.
+		HEEL. A separate torque about the hull's own forward axis, so it rolls with her at any heading.
 
-		It was `rightingTorque * 0.35`. When the righting torque was cut from 900,000 to 250,000 - for entirely
-		unrelated reasons, to stop the hull feeling locked flat - the steering silently went from 315,000 to
-		87,500 and the boat stopped answering the wheel.
-
-		Measured: the hull's moment of inertia about Y is 628,600, and reaching the spec's 0.55 rad/s in two
-		seconds needs 172,865. 87,500 was not enough to turn it at all.
-
-		Two unrelated feel dials must never share one number.
+		Two opposing moments live in here (see `VesselPhysics.heelMoment`): the rudder's inward flick and the
+		centrifugal outward settle. Researched, not invented - a real hull does both, in that order.
 	]]
-	yaw.MaxTorque = spec.yawTorque
-	yaw.AngularVelocity = Vector3.zero
-	yaw.ReactionTorqueEnabled = false
-	yaw.Parent = hull
-	state.yaw = yaw
+	local heel = Instance.new("Torque")
+	heel.Name = "Heel"
+	heel.Attachment0 = driveAt
+	heel.RelativeTo = Enum.ActuatorRelativeTo.Attachment0
+	heel.Torque = Vector3.zero
+	heel.Parent = hull
+	state.heel = heel
 
 	--[[
 		🔴 THE HELM IS A STATION YOU STAND AT, NOT A SEAT YOU SIT IN. THIS IS THE SECOND REWRITE.
@@ -464,6 +527,19 @@ local function step(dt: number)
 	end
 
 	--[[
+		LATERAL GRIP. Kills the sideways component of velocity so a heading change becomes a course change.
+
+		`RightVector` is the hull's own starboard direction, so this works at any heading without a sign
+		convention to get wrong - the lesson from the thrust runaway.
+	]]
+	if state.grip then
+		local right = hull.CFrame.RightVector
+		local lateralSpeed = hull.AssemblyLinearVelocity:Dot(right)
+		local f = VesselPhysics.lateralForce(lateralSpeed, hull:GetMass(), state.spec.lateralGrip)
+		state.grip.Force = right * f
+	end
+
+	--[[
 		TRIM. Positive X torque pitches the bow UP (hull +Z is forward, +X is starboard, so a positive moment
 		about X lifts the nose).
 
@@ -498,15 +574,30 @@ local function step(dt: number)
 		end
 	end
 
-	-- STEER
-	if state.yaw then
-		local rate = VesselPhysics.yawRate(
-			if hasFuel then state.steer else 0,
-			forwardSpeed,
-			state.spec.cruise,
-			state.spec.turnRate
-		)
-		state.yaw.AngularVelocity = Vector3.new(0, rate, 0)
+	--[[
+		STEER. Rudder torque plus yaw damping - a balance, not a commanded rate.
+
+		The damping is what limits the turn and what gives the rudder its lag. Both scale with v^2, which is
+		why the turn radius grows with speed instead of shrinking.
+	]]
+	local steer = if hasFuel then state.steer else 0
+	local yawRate = hull.AssemblyAngularVelocity.Y
+	local rudderT = VesselPhysics.rudderTorque(steer, forwardSpeed, state.spec.cruise, state.rudderAuthority)
+	local dampT = VesselPhysics.yawDamping(yawRate, forwardSpeed, state.spec.cruise, state.yawDamping)
+	if state.rudder then
+		state.rudder.Torque = Vector3.new(0, rudderT + dampT, 0)
+	end
+
+	--[[
+		HEEL. Inward as the wheel goes over, outward once the turn settles. See VesselPhysics.heelMoment.
+
+		Applied about the hull's own forward axis (local -Z is forward, so a roll is about Z), hence
+		Attachment0-relative.
+	]]
+	if state.heel then
+		local moment = VesselPhysics.heelMoment(
+			rudderT, yawRate, forwardSpeed, state.heelIn, state.heelOut)
+		state.heel.Torque = Vector3.new(0, 0, moment)
 	end
 
 	-- FUEL

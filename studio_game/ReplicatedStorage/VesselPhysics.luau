@@ -295,7 +295,139 @@ function VesselPhysics.yawRate(steer: number, forwardSpeed: number, cruise: numb
 		backing a boat off a shoal being awkward is good, not a bug to paper over.
 	]]
 	local direction = if forwardSpeed < -0.5 then -1 else 1
-	return s * turnRate * rampIn * bleed * direction
+	--[[
+		🔴 NEGATED, because Roblox's Y rotation is counter-clockwise from above.
+
+		A positive angular velocity about +Y rotates the forward vector (which is -Z) toward -X, i.e. to PORT.
+		So sending steer = +1 for "right" produced a turn to the LEFT. Steering was inverted by construction,
+		and no amount of tuning would have shown it - only driving it would, which is exactly what I failed to
+		do before handing it over.
+	]]
+	return -s * turnRate * rampIn * bleed * direction
+end
+
+--[[
+	🔴 LATERAL GRIP - the missing system that made her "turn on the spot but keep going straight".
+
+	A hull refuses to move sideways. That is what a keel IS, and it is what converts a change of HEADING into
+	a change of DIRECTION. Without it, yawing the hull merely rotates it while momentum carries the boat dead
+	ahead - it crabs sideways down its original course, nose pointing somewhere else entirely.
+
+	I had no lateral resistance whatsoever. Forward drag existed, sideways drag did not.
+
+	Modelled as a time constant rather than a coefficient, because that is the quantity with meaning: `grip`
+	is roughly how many seconds it takes to kill sideways motion. Force = mass / grip x lateralSpeed, so a
+	smaller number grips harder.
+
+	    0.3   speedboat, bites hard, almost no drift
+	    0.6   working launch - follows her nose with a little slip
+	    1.5   barge, slides through turns
+
+	Deriving it from mass means the same number behaves the same way on a cutter, which is the whole point of
+	the kit.
+]]
+function VesselPhysics.lateralForce(lateralSpeed: number, mass: number, grip: number): number
+	if lateralSpeed ~= lateralSpeed then
+		return 0
+	end
+	return -(mass / math.max(grip, 0.05)) * lateralSpeed
+end
+
+--[[
+	🔴 THE RUDDER. A TORQUE, not a commanded yaw rate.
+
+	This replaced an `AngularVelocity`, and the reason is the whole feel of the boat.
+
+	`AngularVelocity` is a SERVO: it drives to a target rate with up to MaxTorque, so the instant the wheel
+	goes over the hull is already rotating at the full commanded rate. There is no build-up, no rudder lag,
+	and no dependence on the hull's own resistance to turning. The rotation is IMPOSED rather than earned,
+	and that is precisely what "it just rotates on the spot" feels like. The boat system doc asks for a
+	"controlled force-based boat controller" and this was not one.
+
+	A real rudder applies a torque; the yaw rate that results is a balance between that torque and the hull's
+	yaw damping.
+
+	--------------------------------------------------------------------------------------------------
+	WHY BOTH TERMS SCALE WITH v^2
+
+	Rudder force scales with the square of water speed - it is a foil, and no flow means no force. So does
+	hydrodynamic yaw damping, for the same reason.
+
+	That pairing is what produces the behaviour the doc asks for, and it falls out rather than being forced:
+
+	    steady yaw rate = rudderTorque / yawDamping   -> both scale with v^2, so the RATE is
+	                                                     roughly speed-independent
+	    turn radius     = speed / yaw rate            -> therefore GROWS LINEARLY WITH SPEED
+
+	"Wider turns at high speed" for free. A constant damping term would have given the opposite - radius
+	shrinking as she sped up, which is a car, not a boat.
+
+	`DAMP_FLOOR` keeps a little damping at rest so the hull cannot be spun on the spot by a rudder that has no
+	water flowing past it - "poor turning while nearly stationary", also from the doc.
+]]
+VesselPhysics.DAMP_FLOOR = 0.15
+
+--- Torque the rudder makes. Scales with v^2, because a foil with no flow does nothing.
+function VesselPhysics.rudderTorque(steer: number, forwardSpeed: number, cruise: number, authority: number): number
+	local s = math.clamp(steer, -1, 1)
+	local ratio = math.clamp(math.abs(forwardSpeed) / math.max(cruise, 0.01), 0, 1.4)
+	--[[
+		Reversing inverts the rudder, exactly as a real one does - the flow arrives from the other side. Kept
+		because it is true, and because backing a boat off a shoal being awkward is good.
+	]]
+	local direction = if forwardSpeed < -0.5 then -1 else 1
+	-- negated: positive rotation about +Y is counter-clockwise from above, so steer right needs a negative rate
+	return -s * authority * ratio * ratio * direction
+end
+
+--[[
+	Yaw damping: the hull resisting rotation. This is what LIMITS the turn rate rather than a servo target.
+
+	Also gives the rudder its LAG, which is most of the feel: the time constant is inertia / damping, so the
+	yaw builds over a second or so instead of snapping on.
+]]
+function VesselPhysics.yawDamping(yawRate: number, forwardSpeed: number, cruise: number, damping: number): number
+	local ratio = math.clamp(math.abs(forwardSpeed) / math.max(cruise, 0.01), 0, 1.4)
+	local coefficient = damping * (VesselPhysics.DAMP_FLOOR + (1 - VesselPhysics.DAMP_FLOOR) * ratio * ratio)
+	return -yawRate * coefficient
+end
+
+--[[
+	🔴 HEEL IN A TURN - and it is TWO OPPOSING MOMENTS, which is what makes it look alive.
+
+	Researched rather than guessed (MARIN, "Heel Angles in Turn and Passenger Safety"; ScienceDirect on heel
+	angle). A ship in a turn does not simply lean one way:
+
+	  * TRANSIENT: the rudder force acts before the hull's hydrodynamic side force has built up, and it acts
+	    BELOW the centre of gravity - so she first heels INWARD, into the turn. The maximum heel of the whole
+	    manoeuvre happens here.
+	  * STEADY: once the rate of turn settles, centrifugal force at the centre of gravity - which is ABOVE the
+	    centre of lateral resistance - takes over and she heels OUTWARD.
+
+	This falls out naturally here rather than needing to be scripted, and that is the pleasing part: the
+	rudder torque appears the instant the wheel moves, while the yaw rate takes ~1.3s to build. So the inward
+	flick genuinely precedes the outward settle, for the same reason it does on a real hull.
+
+	Returns a roll moment. Positive = heel to starboard.
+]]
+function VesselPhysics.heelMoment(
+	rudderTorque: number,
+	yawRate: number,
+	forwardSpeed: number,
+	rudderHeel: number,
+	centrifugalHeel: number
+): number
+	--[[
+		Rudder term: acts immediately, heels INTO the turn. A negative rudder torque is a turn to starboard
+		(see rudderTorque), and heeling into a starboard turn means heeling to starboard - hence the negation.
+	]]
+	local transient = -rudderTorque * rudderHeel
+	--[[
+		Centrifugal term: builds with the turn, heels OUT of it. Proportional to yawRate * speed, which is
+		the actual centripetal acceleration, so it grows exactly as the turn tightens.
+	]]
+	local steady = yawRate * forwardSpeed * centrifugalHeel
+	return transient + steady
 end
 
 --[[
