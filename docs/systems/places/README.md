@@ -139,11 +139,45 @@ as unconfirmed rather than proven if it matters.
 | `Name.luau` | `ModuleScript` |
 | `Name.server.luau` | `Script` with `RunContext = Server` |
 | `Name.client.luau` | `Script` with `RunContext = Client` |
+| `Name.local.luau` | **`LocalScript`** (`RunContext = Legacy`) |
+| `Name.legacy.luau` | `Script` with `RunContext = Legacy` |
 | `Name.module.luau` | ⚠️ `ModuleScript` literally named `Name.module` — **`.module` is not a recognised suffix** |
+| `Name.localscript.luau` | ⚠️ Same trap — `ModuleScript` named `Name.localscript` |
 
 The suffix sets `RunContext` regardless of where the file sits: a `.client.luau` dropped into
 `ServerScriptService/` becomes a `Script` with `RunContext = Client`, which will not do what its
 location suggests. Put client code in `StarterPlayerScripts/`.
+
+### 🔴 In `StarterPlayerScripts/`, use `.local.luau` — not `.client.luau`
+
+A `RunContext = Client` script parented to `StarterPlayerScripts` **runs twice**: once where it sits, and
+once as the copy handed to `PlayerScripts`. Roblox warns about it, and the symptom is duplicated work —
+in job 009 it built two admin panels. A `LocalScript` (`RunContext = Legacy`) runs once, as intended.
+
+| Where the code goes | Suffix |
+|---|---|
+| `StarterPlayerScripts/`, `StarterCharacterScripts/` | **`.local.luau`** |
+| `ServerScriptService/` | `.server.luau` |
+| Shared modules anywhere | `.luau` |
+
+### ⚠️ A failed `require` is cached for the whole Edit session
+
+Fix a syntax error in a module and `require` will keep returning
+*"Requested module experienced an error while loading"* — it is serving the cached failure, not re-reading
+your fix. Equally, a module that loaded **before** an edit keeps returning the old version, which can hide
+a breakage entirely: in job 009 the game place happily reported the pre-edit module while the lobby, doing
+a first load, surfaced the real syntax error.
+
+To test the file actually on disk, clone the ModuleScript and require the clone — a different instance
+cannot be served a cached result:
+
+```lua
+local probe = ServerStorage.MyModule:Clone()
+probe.Name = "Probe"
+probe.Parent = ServerStorage
+local ok, result = pcall(require, probe)
+probe:Destroy()
+```
 
 ### Folders and `init.luau`
 

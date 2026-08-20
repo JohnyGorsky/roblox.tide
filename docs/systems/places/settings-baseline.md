@@ -60,7 +60,13 @@ turned out to be read-only to scripts; see section 2.
 | `Players.RespawnTime` | `3` | Default |
 | `Workspace.StreamingEnabled` | `false` | Small bounded space; the Shipyard UI must never wait on streaming |
 | `StarterPlayer.CameraMaxZoomDistance` | `40` | Tighter than the game place — the lobby is an interior-scale space |
-| `Lighting.FogEnd` | `5000` | prov. — finite, but generous enough not to hide the harbour |
+| `Lighting.FogEnd` | `1700` | prov. — **must stay under the harbour's 2048 half-extent** or the water's edge shows. Was 5000, which would have revealed it |
+| `Lighting.FogStart` | `120` | prov. |
+| `Terrain.WaterColor` | `30, 90, 110` | prov. — Storm Teal. Shallower and greener than the open sea |
+| `Terrain.WaterReflectance` | `0.42` | prov. |
+| `Terrain.WaterTransparency` | `0.42` | prov. — you can see the harbour bottom; the open sea cannot |
+| `Terrain.WaterWaveSize` | `0.06` | prov. — sheltered. The lobby must not look like the open sea |
+| `Terrain.WaterWaveSpeed` | `6` | prov. |
 
 ---
 

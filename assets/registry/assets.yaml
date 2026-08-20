@@ -82,3 +82,34 @@ assets:
   place: game
   feature: GAME-0011
   notes: Sand seabed -64..-56 with water -56..0 over 6144x6144 studs. Verified by voxel read-back.
+- id: ASSET-LOBBY-HARBOUR-DOCK
+  type: model
+  status: IDEA
+  source: meshy
+  roblox_path: Workspace.Harbour.MainDock
+  place: lobby
+  feature: GAME-0013
+  notes: The real main dock. Weathered timber jetty with bollards, fenders and mooring cleats.
+    Currently stood in for by GB-LOBBY-DOCK. Part of manifest group 08.
+- id: GB-LOBBY-DOCK
+  type: graybox
+  status: GRAYBOX
+  source: studio
+  represents: ASSET-LOBBY-HARBOUR-DOCK
+  place: lobby
+  roblox_path: Workspace.GB_SpawnDock
+  feature: GAME-0013
+  notes: 64 x 4 x 40 WoodPlanks slab at Y=2, Weathered Wood colour. Exists because the lobby has
+    CharacterAutoLoads=true, so removing the baseplate would drop every joining player into the sea.
+    Tagged Graybox with attribute GrayboxId=GB-LOBBY-DOCK. Keep the footprint when replacing - the
+    spawn and future harbour layout are positioned against it.
+- id: ASSET-HARBOUR-WATER
+  type: terrain
+  status: IMPLEMENTED
+  source: studio
+  roblox_path: Workspace.Terrain
+  place: lobby
+  feature: GAME-0013
+  notes: Sheltered harbour, 4096 x 4096 studs. Sand -48..-40, water -40..0. Shallower, greener and
+    calmer than the open sea (WaveSize 0.06, Transparency 0.42) so the lobby reads as a safe bay.
+    Verified by voxel read-back.

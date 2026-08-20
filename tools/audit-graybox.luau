@@ -19,8 +19,11 @@ local GAME_ID = 100885379547959
 
 -- id -> { represents, place, path }
 local REGISTERED: { [string]: { represents: string, place: string, path: string } } = {
-	-- Example (delete when the first real graybox lands):
-	-- ["GB-BOAT-HULL"] = { represents = "ASSET-BOAT-STARTER", place = "game", path = "Workspace.Vessels.StarterBoat.Hull" },
+	["GB-LOBBY-DOCK"] = {
+		represents = "ASSET-LOBBY-HARBOUR-DOCK",
+		place = "lobby",
+		path = "Workspace.GB_SpawnDock",
+	},
 }
 
 local TAG = "Graybox"

@@ -65,10 +65,17 @@ boundary as account data through DataStores; in-run power does not cross back.
 probe: the nested form never syncs. Do not copy Jungle's nested `sync/StarterPlayer/…` shape.
 
 The file suffix sets the class, **wherever the file sits**: `Name.luau` → `ModuleScript`,
-`Name.server.luau` → `Script` with `RunContext = Server`, `Name.client.luau` → `Script` with
-`RunContext = Client`. `.module.luau` is **not** a recognised suffix — it yields a ModuleScript
-literally named `Name.module`. A folder with an `init.luau` becomes that script, with its siblings
-parented under it.
+`Name.server.luau` → `Script`/Server, `Name.local.luau` → **`LocalScript`**, `Name.legacy.luau` →
+`Script`/Legacy. `.module.luau` and `.localscript.luau` are **not** recognised — they yield a
+ModuleScript with the suffix stuck in its name. A folder with an `init.luau` becomes that script.
+
+🔴 **In `StarterPlayerScripts/` use `.local.luau`, never `.client.luau`** — a `RunContext = Client`
+script there **runs twice** (once in place, once as the `PlayerScripts` copy). Verified in job 009,
+where it built two admin panels.
+
+⚠️ **A failed or stale `require` is cached for the Edit session.** After fixing a module, `require`
+keeps returning the old result or the old error. Clone the ModuleScript and require the clone to read
+what is actually on disk.
 
 **Engine baseline** (job 004, spec in `settings-baseline.md`): the game place has
 `StreamingEnabled = true` — so the boat controller **must** set `ReplicationFocus` to the vessel — and

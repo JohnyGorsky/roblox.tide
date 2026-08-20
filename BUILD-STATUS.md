@@ -68,14 +68,14 @@
 
 | | Feature | Id | Status | Pri |
 |---|---|---|---|---|
-| `#....` | [Admin Panel & Dev Tools](docs/features/0012-admin-panel/feature.md) | GAME-0012 | PLANNED | P1 |
+| `###..` | [Admin Panel & Dev Tools](docs/features/0012-admin-panel/feature.md) | GAME-0012 | IN_PROGRESS | P1 |
 
 ## Roll-up
 
 | Status | Features |
 |---|---|
-| PLANNED | 11 |
-| IN_PROGRESS | 1 |
+| PLANNED | 10 |
+| IN_PROGRESS | 2 |
 | **total** | **12** |
 
 ## The build manifest - what actually needs making
@@ -102,13 +102,18 @@ Groups are sized to be taken one at a time. See [docs/build/README.md](docs/buil
 
 | Status | Count |
 |---|---|
-| IDEA | 7 |
-| IMPLEMENTED | 1 |
+| GRAYBOX | 1 |
+| IDEA | 8 |
+| IMPLEMENTED | 2 |
 
 ### Graybox placeholders awaiting real art
 
-_None registered._ Anything grey standing in for real art belongs here - see
-[assets/README.md](assets/README.md).
+| Placeholder | Stands in for | Place | Note |
+|---|---|---|---|
+| `GB-LOBBY-DOCK` | ASSET-LOBBY-HARBOUR-DOCK | lobby | 64 x 4 x 40 WoodPlanks slab at Y=2, Weathered Wood colour. Exists because the lobby has |
+
+Verify against the live places with `tools/audit-graybox.luau` - it catches placeholders
+that exist in Studio but were never registered.
 
 ## Delivered (jobs with a final summary)
 
@@ -120,6 +125,8 @@ _None registered._ Anything grey standing in for real art belongs here - see
 - [x] **006** Write the build manifest
 - [x] **007** Build the sea: ocean terrain and sea-state presets
 - [x] **008** Add admin panel to the build plan
+- [x] **009** Build the admin gate, panel shell and sea tools
+- [x] **010** Give the lobby water and remove both baseplates
 
 An unchecked job is still in flight.
 
