@@ -57,7 +57,10 @@ Named nights give players stories to tell.
 
 | Item | What it is | GB | Source |
 |---|---|---|---|
-| Storm position model | Distance behind the crew, advancing; server-authoritative | ❌ | code |
+| Storm position model | Distance behind the crew, advancing on a timer; northward travel buys distance back (decision [0019](../decisions/0019-storm-advance-model.md)). **Two tunables — advance rate and studs-gained-per-stud-travelled — and their ratio is the most important balance figure in the game** | ❌ | code |
+| Shelter rate modifier | Moored at a storm shelter, the front closes at ~30%. Never zero | ❌ | code |
+| Storm as a radar contact | The front rendered on the radar station with a readable distance | ⚠️ | code |
+| **Server tick for `compose()`** | ~1/sec, driving the day/night + weather composer. Job 016 built the composer but nothing calls it yet | ❌ | code |
 | Intensity levels 0–4 | Calm → Incoming → Storm → Severe → **The Wall** | ❌ | code |
 | Storm wall geometry | The visible black cloud wall on the horizon | ⚠️ | studio |
 | Cloud wall material | Scrolling, layered, parallaxing; readable at distance | ⚠️ | studio |
@@ -131,9 +134,13 @@ it affordable.
 - ~~What does being caught by the storm actually do?~~ **Decided:** escalating damage, escapable if the
   crew acts — decision [0014](../decisions/0014-storm-consequence.md). Tuning target is 30–60 seconds of
   survivability inside The Wall.
-- **Is the storm distance visible as a number?** A HUD readout is clear; a purely visual/audible storm is
-  more frightening. Perhaps radar shows it and the HUD does not.
-- **Can you shelter?** Island 10 is a "storm shelter". If sheltering works, the storm stops being a wall
-  and becomes a puzzle — which may be better.
+- ~~Is the storm distance visible as a number?~~ **Decided:** radar owns the number as a physical contact;
+  the HUD only throws temporary threshold alerts — decision
+  [0019](../decisions/0019-storm-advance-model.md). Note the arc this creates: radar dies inside The Wall,
+  so the crew watches it approach right up to the moment they most need it, then goes blind.
+- ~~Can you shelter?~~ **Decided:** a shelter *slows* the front to roughly 30%, never stops it. A full stop
+  would let a cautious crew wait indefinitely, which is the loitering decision 0007 exists to prevent.
+- ~~How does it advance?~~ **Decided:** on a timer, with northward progress buying distance back — so
+  looting is spent distance, and fuel becomes the real currency of the game.
 - **Night length vs mobile session length.** A 4-minute night plus a 5-minute day is a 9-minute cycle;
   three cycles is a 27-minute run. Is that the target session?

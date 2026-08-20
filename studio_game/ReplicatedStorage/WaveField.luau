@@ -88,6 +88,8 @@ local ATTR_STATE = "SeaState"
 local ATTR_BLEND_FROM = "SeaBlendFrom"
 local ATTR_BLEND_AT = "SeaBlendStartedAt"
 local ATTR_BLEND_DUR = "SeaBlendDuration"
+--- Everyday weather's multiplier on wave height, published by LocalWeather (decision 0020).
+local ATTR_WAVE_SCALE = "WaveScale"
 
 local DEFAULT_STATE = "LightSwell"
 
@@ -108,8 +110,8 @@ function WaveField.getState(): any
 	return stateByName(workspace:GetAttribute(ATTR_STATE)) or SeaStates[DEFAULT_STATE]
 end
 
---- Returns the wave spec to sample right now, interpolating if a blend is in flight.
-local function currentWave(): any
+--- The state's own wave spec, interpolated if a blend is in flight. Before everyday weather is applied.
+local function blendedWave(): any
 	local target = WaveField.getState()
 	local from = stateByName(workspace:GetAttribute(ATTR_BLEND_FROM))
 	local startedAt = workspace:GetAttribute(ATTR_BLEND_AT)
@@ -132,6 +134,37 @@ local function currentWave(): any
 		choppiness = n(a.choppiness, b.choppiness),
 		directionSpread = n(a.directionSpread, b.directionSpread),
 		directionDeg = n(a.directionDeg, b.directionDeg),
+	}
+end
+
+--[[
+	The spec to sample right now: the state's wave, scaled by everyday weather (decision 0020).
+
+	ONE place applies the scale, and every consumer goes through here - HeightAt, NormalAt, SurfaceAt,
+	SubmersionAt, measureRange. Scaling at the call sites instead would let a hull float at one wave height
+	while the normals came from another, which reads as the boat sitting *through* the water.
+
+	Read from an attribute rather than passed in, for the usual reason: this module has a separate copy per
+	context, so an upvalue would let the server and each client disagree about how big the sea is.
+
+	`choppiness` rises with the scale but only a third as fast. A bigger sea is a steeper sea, but pushing
+	choppiness at full rate sent the crest exponent past the point where the surface reads as spikes rather
+	than water.
+]]
+local function currentWave(): any
+	local w = blendedWave()
+	local scale = workspace:GetAttribute(ATTR_WAVE_SCALE)
+	if typeof(scale) ~= "number" or scale == 1 then
+		return w
+	end
+	scale = math.clamp(scale, 0.2, 2)
+	return {
+		amplitude = w.amplitude * scale,
+		length = w.length,
+		speed = w.speed,
+		choppiness = math.clamp(w.choppiness * (1 + (scale - 1) / 3), 0, 1),
+		directionSpread = w.directionSpread,
+		directionDeg = w.directionDeg,
 	}
 end
 

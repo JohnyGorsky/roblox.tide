@@ -33,6 +33,7 @@ local Lighting = game:GetService("Lighting")
 
 local SeaStates = require(ReplicatedStorage:WaitForChild("SeaStates"))
 local SkyLibrary = require(ReplicatedStorage:WaitForChild("SkyLibrary"))
+local LocalWeather = require(ReplicatedStorage:WaitForChild("LocalWeather"))
 
 local DayNight = {}
 
@@ -289,9 +290,93 @@ local function timeBase(): PhaseLook
 end
 
 --[[
+	The rendered water, composed from the active sea state.
+
+	🔴 THIS WAS MISSING ENTIRELY until job 018, and it is worth recording because the symptom was so
+	misleading. `StormFront` set the sea state and the wave FIELD followed it, but nothing wrote Terrain -
+	so as the front closed, the sky darkened and the fog shut while the water kept whatever colour and wave
+	size the last admin-panel click had left on it. Walking the storm in *looked* like it was working,
+	because four of the five channels were changing.
+
+	Terrain water lives here for the same reason Lighting does: exactly one writer, so two systems cannot
+	disagree and leave a flicker to debug.
+
+	The blend is read straight off the shared attributes rather than through WaveField, to avoid making the
+	composer depend on the wave field just to smooth a colour.
+]]
+local function composeWater(state: any)
+	local Terrain = workspace.Terrain
+
+	-- Follow the same crossfade the wave field is using, so the look and the physics change together.
+	local fromName = workspace:GetAttribute("SeaBlendFrom")
+	local startedAt = workspace:GetAttribute("SeaBlendStartedAt")
+	local dur = workspace:GetAttribute("SeaBlendDuration")
+	local from = if typeof(fromName) == "string" then SeaStates.get(fromName) else nil
+	if from and typeof(startedAt) == "number" and typeof(dur) == "number" and dur > 0 then
+		local t = (workspace:GetServerTimeNow() - startedAt) / dur
+		if t > 0 and t < 1 then
+			state = SeaStates.lerp(from, state, t)
+		end
+	end
+
+	local water = state.water
+	Terrain.WaterColor = water.color
+	Terrain.WaterReflectance = water.reflectance
+	Terrain.WaterTransparency = water.transparency
+
+	--[[
+		Everyday weather scales the visible sea alongside the wave field (decision 0020), so the rendered
+		water and the field the hull floats on never disagree about how big the sea is.
+
+		WaterWaveSize is CAPPED AT 1.0 by the engine - it silently clamps rather than erroring, which is
+		how The Wall's original 1.4 went unnoticed. The clamp is explicit here so the cap is visible in the
+		code rather than discovered by read-back.
+	]]
+	local scale = LocalWeather.waveScale()
+	Terrain.WaterWaveSize = math.clamp(water.waveSize * scale, 0, 1)
+	Terrain.WaterWaveSpeed = math.max(water.waveSpeed * scale, 0)
+end
+
+--[[
+	The built-in cloud layer.
+
+	`Clouds` is real volumetric cloud, it ships with the engine, and it costs no assets - measured
+	2026-08-20: Cover and Density both accept 0..1 and clamp silently above it, and there is NO bearing or
+	direction control of any kind. It is a whole-sky layer.
+
+	That limitation is why it is only half the storm's sky. It thickens everything overhead, which is what
+	this does; the DIRECTIONAL wall astern - the part a crew can turn round and look at - is
+	`CloudWallVFX` on the client.
+
+	🔴 DRIVEN BY SEVERITY, WHICH MEANS STORM-ONLY.
+
+	Everyday weather deliberately has no say here (decision 0020). Cloud cover changes the light and the
+	mood, which is the storm's language, and letting a passing shower black out the sky is exactly the
+	false alarm that decision exists to prevent. Weather gets wind, waves, rain and fog. Not this.
+]]
+local CLOUD_PALE = Color3.fromRGB(196, 203, 210)
+local CLOUD_BLACK = Color3.fromRGB(26, 30, 36)
+
+local function composeClouds(sev: number)
+	local clouds = workspace.Terrain:FindFirstChildOfClass("Clouds")
+	if not clouds then
+		return
+	end
+	--[[
+		Cover rises FASTER than severity (the 0.7 power), so the sky is already meaningfully overcast at
+		Choppy. A linear ramp left intensity 2 looking like a pleasant day with a dark sea, which read as
+		the two systems disagreeing rather than as weather.
+	]]
+	clouds.Cover = math.clamp(0.15 + 0.85 * (sev ^ 0.7), 0, 1)
+	clouds.Density = math.clamp(0.35 + 0.65 * sev, 0, 1)
+	clouds.Color = CLOUD_PALE:Lerp(CLOUD_BLACK, sev)
+end
+
+--[[
 	Apply time-of-day blended with the active sea state's weather, weighted by severity (decision 0018).
 
-	Call this every second or so from the server. It is the only writer of Lighting.
+	Call this every second or so from the server. It is the only writer of Lighting, of Terrain water, and
+	of the cloud layer.
 ]]
 function DayNight.compose(): string
 	local base = timeBase()
@@ -346,6 +431,23 @@ function DayNight.compose(): string
 		Lighting.FogStart = Lighting.FogEnd * 0.06
 		Lighting.FogColor = base.fogColor:Lerp(state.sky.fogColor, sev)
 	end
+
+	--[[
+		Everyday weather closes the horizon a little (decision 0020).
+
+		Fog is the ONE lighting property weather may touch, and the reason it is allowed is that distance
+		is not darkness: a fog bank on a bright afternoon still reads as a bright afternoon. Brightness,
+		ambient, haze and the sky stay out of reach, because dimming is the storm's vocabulary.
+
+		The clamp is not optional. `FOG_SCALE_MAX` is above 1, and Dead Calm already sits at fogEnd 2900,
+		so a clear spell would push it to 3074 - past the edge of the filled ocean at 3072, which shows the
+		player the water simply stopping (see SeaStates.OCEAN_HALF_EXTENT).
+	]]
+	Lighting.FogEnd = math.min(Lighting.FogEnd * LocalWeather.fogScale(), SeaStates.OCEAN_HALF_EXTENT - 1)
+	Lighting.FogStart = math.min(Lighting.FogStart, Lighting.FogEnd * 0.5)
+
+	composeWater(state)
+	composeClouds(sev)
 
 	local baseAmb = base.outdoorAmbient
 	local weatherAmb = SeaStates.BASE_AMBIENT

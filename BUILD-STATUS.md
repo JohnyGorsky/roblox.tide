@@ -26,7 +26,7 @@
 
 | | Feature | Id | Status | Pri |
 |---|---|---|---|---|
-| `#....` | [Advancing Storm Front](docs/features/0003-storm-front/feature.md) | GAME-0003 | PLANNED | P0 |
+| `###..` | [Advancing Storm Front](docs/features/0003-storm-front/feature.md) | GAME-0003 | IN_PROGRESS | P0 |
 | `###..` | [Day / Dusk / Night](docs/features/0004-day-night/feature.md) | GAME-0004 | IN_PROGRESS | P0 |
 
 ### islands
@@ -76,9 +76,9 @@
 
 | Status | Features |
 |---|---|
-| PLANNED | 9 |
+| PLANNED | 8 |
 | READY | 1 |
-| IN_PROGRESS | 4 |
+| IN_PROGRESS | 5 |
 | **total** | **14** |
 
 ## The build manifest - what actually needs making
@@ -137,6 +137,7 @@ that exist in Studio but were never registered.
 - [x] **014** Make the game place enterable for a dev: spawn-on-demand and an observation deck
 - [x] **015** Source and vet overcast/storm skies
 - [x] **016** Day/night cycle with severity-based weather composition
+- [x] **017** Storm core: position, intensity, and the server tick
 
 An unchecked job is still in flight.
 

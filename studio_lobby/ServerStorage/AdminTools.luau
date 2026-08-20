@@ -504,6 +504,287 @@ end)
 	state - e.g. seeing whether Snow Grey or Fog on Water suits Choppy better. Switching state afterwards
 	will overwrite it, which is correct: the state owns the sky.
 ]]
+-- ---------------------------------------------------------------------------
+-- Storm
+-- ---------------------------------------------------------------------------
+--[[
+	The storm sets intensity; intensity picks a sea state; the state's severity drives the look through
+	DayNight.compose(). So these tools never touch Lighting either - they move the front and let the flow
+	do the rest, exactly as the real game will.
+]]
+
+local function stormFront(): any
+	local mod = ReplicatedStorage:FindFirstChild("StormFront")
+	if not mod then return nil end
+	local ok, m = pcall(require, mod)
+	return ok and m or nil
+end
+
+tools.stormDistance = {
+	id = "stormDistance",
+	label = "Storm distance",
+	section = "Storm",
+	scope = "global",
+	controls = {
+		kind = "choice",
+		options = { "4.2 km (start)", "2.5 km incoming", "1.5 km storm", "0.7 km severe", "0.15 km THE WALL" },
+	},
+	run = function(_player: Player, args: any)
+		local SF = stormFront()
+		if not SF then return false, "StormFront not found" end
+		local map = {
+			["4.2 km (start)"] = 4200,
+			["2.5 km incoming"] = 2500,
+			["1.5 km storm"] = 1500,
+			["0.7 km severe"] = 700,
+			["0.15 km THE WALL"] = 150,
+		}
+		local d = map[tostring(args and args.value)]
+		if not d then return false, "unknown distance" end
+        SF.reset(d)
+		local band = SF.bandFor(d)
+		return true, ("front at %.0f studs -> intensity %d %s, sea %s, wind %.2f")
+			:format(d, band.intensity, band.label, band.sea, SF.wind())
+	end,
+}
+
+tools.stormShelter = {
+	id = "stormShelter",
+	label = "Shelter (slows to 30%)",
+	section = "Storm",
+	scope = "global",
+	controls = { kind = "choice", options = { "moored at shelter", "at sea" } },
+	run = function(_player: Player, args: any)
+		local SF = stormFront()
+		if not SF then return false, "StormFront not found" end
+		local sheltered = tostring(args and args.value) == "moored at shelter"
+		SF.setSheltered(sheltered)
+		return true, sheltered and "sheltered - front closes at 30%, never stops" or "at sea - full rate"
+	end,
+}
+
+tools.stormReport = {
+	id = "stormReport",
+	label = "Storm status",
+	section = "Storm",
+	scope = "local",
+	controls = { kind = "button", output = "text" },
+	run = function(_player: Player, _args: any)
+		local SF = stormFront()
+		if not SF then return false, "StormFront not found" end
+		return true, SF.report()
+	end,
+}
+
+--[[
+	The sensory channels, reported from the CLIENT.
+
+	`scope = "local"` matters here and is not a detail: the rain, the spray and the cloud wall are all
+	camera-local client rigs, so a server-side report would truthfully say they do not exist. Job 017 shipped
+	VFX that nothing ever started and the storm still *looked* like it worked, because the server-composed
+	channels replicate on their own - so "is the client half actually running" is a question worth being able
+	to ask directly.
+]]
+tools.vfxReport = {
+	id = "vfxReport",
+	label = "Rain / spray / cloud wall status",
+	section = "Storm",
+	scope = "local",
+	controls = { kind = "button", output = "text" },
+	run = function(_player: Player, _args: any)
+		local lines = {}
+		for _, name in ipairs({ "StormVFX", "CloudWallVFX" }) do
+			local m = ReplicatedStorage:FindFirstChild(name)
+			if not m then
+				table.insert(lines, name .. ": module not found")
+			else
+				local ok, mod = pcall(require, m)
+				if not ok then
+					table.insert(lines, name .. ": failed to load - " .. tostring(mod))
+				else
+					table.insert(lines, "-- " .. name .. " --")
+					table.insert(lines, mod.report())
+				end
+			end
+			table.insert(lines, "")
+		end
+		return true, table.concat(lines, "\n")
+	end,
+}
+
+local function localWeather()
+	local m = ReplicatedStorage:FindFirstChild("LocalWeather")
+	if not m then return nil end
+	local ok, mod = pcall(require, m)
+	return ok and mod or nil
+end
+
+--[[
+	TIME SCALE - the tool that made job 018 necessary.
+
+	`Storm distance` teleports the front, which shows you five looks but never an approach. This speeds the
+	clock instead, so the escalation can actually be watched building. 10x turns a five-minute approach into
+	thirty seconds; 30x into ten.
+]]
+tools.timeScale = {
+	id = "timeScale",
+	label = "Time scale (storm speed)",
+	section = "Storm",
+	scope = "global",
+	controls = {
+		kind = "choice",
+		options = { "1x real time", "3x", "10x", "30x", "frozen" },
+	},
+	run = function(_player: Player, args: any)
+		local map = { ["1x real time"] = 1, ["3x"] = 3, ["10x"] = 10, ["30x"] = 30, ["frozen"] = 0 }
+		local scale = map[tostring(args and args.value)]
+		if not scale then return false, "unknown scale" end
+		workspace:SetAttribute("TimeScale", scale)
+		if scale == 0 then
+			return true, "storm frozen. Everything else still runs, so the look keeps composing."
+		end
+		local SF = stormFront()
+		local secs = SF and (SF.distance() / (SF.ADVANCE_RATE * scale)) or 0
+		return true, ("%dx - the front reaches you in %.0fs from here (%.0fs at 1x)")
+			:format(scale, secs, secs * scale)
+	end,
+}
+
+--[[
+	One click for the thing that is actually hard to see: the whole approach, start to finish.
+
+	Resets to full distance and winds the clock up, because doing it by hand means two tools and remembering
+	to put the scale back afterwards.
+]]
+tools.stormApproach = {
+	id = "stormApproach",
+	label = "Watch a full approach",
+	section = "Storm",
+	scope = "global",
+	controls = { kind = "choice", options = { "30 seconds (10x)", "60 seconds (5x)", "10 seconds (30x)" } },
+	run = function(_player: Player, args: any)
+		local SF = stormFront()
+		if not SF then return false, "StormFront not found" end
+		local map = { ["30 seconds (10x)"] = 10, ["60 seconds (5x)"] = 5, ["10 seconds (30x)"] = 30 }
+		local scale = map[tostring(args and args.value)]
+		if not scale then return false, "unknown speed" end
+		SF.reset(SF.START_DISTANCE)
+		SF.setSheltered(false)
+		workspace:SetAttribute("TimeScale", scale)
+		return true, ("front reset to %.1f km and clock at %dx. It arrives in ~%.0fs - watch ASTERN.\nRemember to set the scale back to 1x before judging balance.")
+			:format(SF.distanceKm(), scale, SF.START_DISTANCE / (SF.ADVANCE_RATE * scale))
+	end,
+}
+
+--[[
+	Force a strike, rather than waiting on the dice.
+
+	Lightning is silent below storm intensity 2 and rolls at 2/minute at intensity 2, so testing it by
+	waiting means sitting through a storm hoping. This calls the same roll-and-fire the server uses, so what
+	is tested is the real path - it only skips the waiting.
+]]
+tools.lightningStrike = {
+	id = "lightningStrike",
+	label = "Force a lightning strike",
+	section = "Storm",
+	scope = "global",
+	controls = {
+		kind = "choice",
+		options = { "random", "distant (2 km)", "close (300)", "overhead (180)" },
+	},
+	run = function(_player: Player, args: any)
+		local mod = ReplicatedStorage:FindFirstChild("Lightning")
+		if not mod then return false, "Lightning not found" end
+		local ok, L = pcall(require, mod)
+		if not ok then return false, "Lightning failed to load: " .. tostring(L) end
+		local fire = (_G :: any).TideLightningFire
+		local roll = (_G :: any).TideLightningRoll
+		if not fire or not roll then
+			return false, "LightningServer is not running - is the game in Play?"
+		end
+
+		local choice = tostring(args and args.value)
+		local intensity = workspace:GetAttribute("StormIntensity")
+		local strike = roll(if typeof(intensity) == "number" then intensity else 3)
+		local forced = { ["distant (2 km)"] = 2000, ["close (300)"] = 300, ["overhead (180)"] = 180 }
+		if forced[choice] then
+			strike.distance = forced[choice]
+			-- Re-roll the fault, since it is decided from distance and we have just changed it.
+			strike.fault = nil
+			if strike.distance <= L.CLOSE_DISTANCE and math.random() < 0.5 then
+				strike.fault = "radar"
+			end
+		end
+		fire(strike)
+		return true, ("struck at %.0f studs, bearing %.0f, magnitude %.2f\nthunder in %.1fs%s")
+			:format(strike.distance, strike.bearing, strike.magnitude,
+				L.thunderDelay(strike.distance),
+				strike.fault and ("\nfault raised: " .. strike.fault .. " (nothing consumes it yet)") or "")
+	end,
+}
+
+--[[
+	EVERYDAY WEATHER (decision 0020).
+
+	Its own section, deliberately, and not under Storm - because the whole point of the system is that the
+	two are unrelated. A panel that filed "showers" under "Storm" would teach the wrong thing to the person
+	testing it.
+]]
+tools.weatherSet = {
+	id = "weatherSet",
+	label = "Pin today's weather",
+	section = "Weather",
+	scope = "global",
+	controls = {
+		kind = "choice",
+		options = { "auto (drifts)", "Glassy", "Slight", "Moderate", "Fresh", "Rough" },
+	},
+	run = function(_player: Player, args: any)
+		local LW = localWeather()
+		if not LW then return false, "LocalWeather not found" end
+		local value = tostring(args and args.value)
+		if value == "auto (drifts)" then
+			LW.setOverride(nil)
+			return true, "handed back to the clock - it drifts on its own again"
+		end
+		local map = { Glassy = 0.05, Slight = 0.25, Moderate = 0.46, Fresh = 0.70, Rough = 0.95 }
+		local u = map[value]
+		if not u then return false, "unknown weather" end
+		LW.setOverride(u)
+		return true, ("pinned at %s (%.2f)\nwaves x%.2f, wind %.2f, fog x%.2f\nNote: the sky and the light do NOT change - that is deliberate (decision 0020).")
+			:format(value, u, LW.waveScale(), LW.wind(), LW.fogScale())
+	end,
+}
+
+tools.weatherForecast = {
+	id = "weatherForecast",
+	label = "Forecast (next 20 min)",
+	section = "Weather",
+	scope = "local",
+	controls = { kind = "button", output = "text" },
+	run = function(_player: Player, _args: any)
+		local LW = localWeather()
+		if not LW then return false, "LocalWeather not found" end
+		if LW.isOverridden() then
+			return true, "weather is PINNED - set it back to auto to see the drift.\n\n" .. LW.forecast(20, 120)
+		end
+		return true, LW.forecast(20, 120)
+	end,
+}
+
+tools.weatherReport = {
+	id = "weatherReport",
+	label = "Weather status",
+	section = "Weather",
+	scope = "local",
+	controls = { kind = "button", output = "text" },
+	run = function(_player: Player, _args: any)
+		local LW = localWeather()
+		if not LW then return false, "LocalWeather not found" end
+		return true, LW.report()
+	end,
+}
+
 tools.setSky = {
 	id = "setSky",
 	label = "Sky (override)",

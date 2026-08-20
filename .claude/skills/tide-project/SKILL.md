@@ -109,7 +109,7 @@ why: [decision 0013](../../../docs/decisions/0013-two-places-lobby-and-game.md).
 | Vision, core loop, pillars, progression, monetization, naming | `docs/game/` |
 | Visual/UI direction (palette, typography, HUD rules) | [visual-design.md](../../../docs/game/visual-design.md), [gui.md](../../../docs/game/gui.md), [fonts.md](../../../docs/game/fonts.md) |
 | Intended behavior of each system (17 of them) | `docs/systems/` |
-| Why an important choice was made (18 accepted) | `docs/decisions/` |
+| Why an important choice was made (19 accepted) | `docs/decisions/` |
 | Compact catalogs — enemies, weapons, vessels, islands, loot, events, encounters, upgrades, parts, crew | `docs/content/` |
 | The two places and what lives in each | [systems/places/README.md](../../../docs/systems/places/README.md) |
 | **What must be built, and how much of it** | [build/README.md](../../../docs/build/README.md) + [BUILD-STATUS.md](../../../BUILD-STATUS.md) (generated) |

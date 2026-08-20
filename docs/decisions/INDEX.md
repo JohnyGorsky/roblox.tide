@@ -18,3 +18,4 @@
 - [0016 — Island templates are a TerrainRegion plus a prop Model](0016-island-template-storage.md)
 - [0017 — NPCs navigate the vessel in its own local space](0017-vessel-local-navigation.md)
 - [0018 — Time is the base, weather overrides by severity](0018-time-base-weather-override.md)
+- [0019 — The storm advances on a clock; distance is bought by moving](0019-storm-advance-model.md)
