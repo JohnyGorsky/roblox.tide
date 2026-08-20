@@ -13,6 +13,7 @@
 | | Feature | Id | Status | Pri |
 |---|---|---|---|---|
 | `###..` | [Sea & Sea States](docs/features/0011-sea-states/feature.md) | GAME-0011 | IN_PROGRESS | P0 |
+| `##...` | [Wave Field](docs/features/0014-wave-field/feature.md) | GAME-0014 | READY | P0 |
 
 ### boat
 
@@ -39,6 +40,7 @@
 | | Feature | Id | Status | Pri |
 |---|---|---|---|---|
 | `#....` | [Shipyard Parts Progression](docs/features/0010-shipyard-parts-progression/feature.md) | GAME-0010 | PLANNED | P1 |
+| `###..` | [Harbour Environment](docs/features/0013-harbour-environment/feature.md) | GAME-0013 | IN_PROGRESS | P1 |
 
 ### navigation
 
@@ -75,8 +77,9 @@
 | Status | Features |
 |---|---|
 | PLANNED | 10 |
-| IN_PROGRESS | 2 |
-| **total** | **12** |
+| READY | 1 |
+| IN_PROGRESS | 3 |
+| **total** | **14** |
 
 ## The build manifest - what actually needs making
 
@@ -127,6 +130,8 @@ that exist in Studio but were never registered.
 - [x] **008** Add admin panel to the build plan
 - [x] **009** Build the admin gate, panel shell and sea tools
 - [x] **010** Give the lobby water and remove both baseplates
+- [x] **011** Record decisions 0014-0017: storm consequence, shared rig, island storage, deck navigation
+- [ ] **012** Wave field: HeightAt / NormalAt for the sea surface
 
 An unchecked job is still in flight.
 

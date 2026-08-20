@@ -138,7 +138,7 @@ Rare enough to be talked about. Each should produce a story.
 
 | Item | What it is | GB | Source |
 |---|---|---|---|
-| Island template format | Terrain region + props + metadata, saved and versioned | ❌ | code |
+| Island template format | `TerrainRegion` + prop `Model` + markers in ServerStorage (decision [0016](../decisions/0016-island-template-storage.md)) | ❌ | code |
 | Terrain save/paste | Capture a region and paste it at runtime, reliably | ❌ | code |
 | Streaming-safe placement | Wait for terrain, probe the ground, then seat props | ❌ | code |
 | Footprint validation | Validate across the whole footprint, not one raycast — a 200-stud island is not a point | ❌ | code |
@@ -174,9 +174,9 @@ Rare enough to be talked about. Each should produce a story.
 
 ## Open questions
 
-- **How is a template stored?** Terrain regions are large binary data. Serialised terrain in
-  ServerStorage, or a hand-built place per island loaded via another mechanism? This decides the whole
-  pipeline — answer in job 1.
+- ~~How is a template stored?~~ **Decided:** a `TerrainRegion` in `ServerStorage` plus a prop `Model` and
+  a marker set — decision [0016](../decisions/0016-island-template-storage.md). Terrain data is bulky, so
+  keep the library curated; and terrain must exist before props are seated.
 - **Do islands persist while you are near them, or reset?** If a player returns to a looted island,
   is it still looted?
 - **Can the boat be attacked while the crew is ashore?** Enormously good tension, and it means the

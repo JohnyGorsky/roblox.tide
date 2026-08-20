@@ -21,20 +21,43 @@ because one enemy is a mesh, a rig, five animations, a sound set, an AI behaviou
 Each file is one work package. They are ordered so that each group can be judged as soon as it lands,
 and so nothing waits on something that does not exist yet.
 
-| # | Group | Why here in the order |
-|---|---|---|
-| [01](01-sea.md) | Sea & horizon | Everything else floats on it. Judgeable immediately, and it decides how big the world feels |
-| [02](02-boat-parts.md) | Boat parts | The mobile base. The single biggest item count in the project |
-| [03](03-items-props.md) | Items & props | Small, reusable, needed by every island and the whole loot loop |
-| [04](04-islands.md) | Islands & sea POIs | Needs 01 (water line) and 03 (props to put on them) |
-| [05](05-enemies.md) | Enemies & groups | Needs 04 to have somewhere to live |
-| [06](06-weapons.md) | Weapons | Needs 05 to have something to shoot |
-| [07](07-atmosphere.md) | Atmosphere, storm, day/night | Layers on top of 01; the storm is the macro pressure |
-| [08](08-lobby-shipyard.md) | Lobby & shipyard | Separate place; can proceed in parallel any time |
-| [09](09-ui.md) | UI & HUD | Needs the systems it reports on to exist first |
-| [10](10-crew.md) | NPC crew | Needs 02 (stations) and 11 (animations) |
-| [11](11-animations.md) | Animations | Cross-cutting; the player set is needed early, enemy sets follow 05 |
-| [12](12-audio.md) | Audio | Cross-cutting; cheapest big win once scenes exist |
+| P | # | Group | First job | Note |
+|---|---|---|---|---|
+| **P0** | [01](01-sea.md) | Sea & horizon | Wave field (`HeightAt`/`NormalAt`) | Ocean built; this is the maths everything floats on. Look **blocked on sky assets** |
+| **P0** | [07](07-atmosphere.md) | Atmosphere & storm | Day/night cycle, then storm core | Judgeable with no boat at all. Defines the *full range* of sea before anything is tuned to it |
+| **P0** | [02](02-boat-parts.md) | Boat parts | Vessel foundation — hull at real size, floats, steers | Arrives into a finished world, so buoyancy is tuned once against calm *and* The Wall |
+| **P0** | [03](03-items-props.md) | Items & props | Item foundation + run resources | Fuel/scrap/ammo *is* the loop |
+| **P0** | [04](04-islands.md) | Islands & POIs | Template pipeline + the small island | Somewhere to go |
+| **P0** | [11](11-animations.md) | Animations | Foundation + player task set | Repair must look like repair |
+| **P0** | [09](09-ui.md) | UI & HUD | Design system, then minimal HUD | You must be able to read fuel and hull |
+| **P0** | [05](05-enemies.md) | Enemies | Foundation + the shark | The first night threat |
+| **P0** | [06](06-weapons.md) | Weapons | The signature trio: MG, harpoon, flare | Something to fight with |
+| **P1** | [08](08-lobby-shipyard.md) | Lobby & shipyard | Persistence foundation | The reason to play a *second* run |
+| **P1** | [12](12-audio.md) | Audio | Foundation + vessel machinery | Cheapest large gain in mood |
+| **P1** | [10](10-crew.md) | NPC crew | Crew foundation (one Engineer) | Makes solo and small parties work |
+| **P2** | [13](13-admin-tools.md) | Admin panel | *gate + sea tools done* | Accelerator; grows with the systems |
+
+**P0 = the POC loop.** These nine are exactly what [roadmap/poc.md](../roadmap/poc.md) needs to answer the
+only question that matters yet: *is `explore → dusk → survive → dawn` fun with other people?* Build the
+**first job** of each, not the whole group — group 02 alone is nine jobs.
+
+**P1** is what makes people come back — persistence above all. **P2** is depth and support.
+
+### Why sea and atmosphere come before the boat
+
+Both are judgeable with no boat in the world, and between them they define the **full range of sea** the
+vessel has to cope with. Building the boat first means tuning buoyancy against Light Swell, then re-tuning
+it when Storm and The Wall appear; doing it after means tuning once, against everything.
+
+⚠️ **One part of group 07 cannot precede the boat.** Decision
+[0014](../decisions/0014-storm-consequence.md) makes the storm inflict hull damage and system faults — and
+there is no hull and no system to fault until group 02 exists. So 07 splits:
+
+| Before the boat | After the boat |
+|---|---|
+| Day/night cycle, storm position and intensity, sea-state coupling, cloud wall, rain, wind, lightning, fog | The caught-by-storm consequence: damage rate, forced faults, the 30–60s escape window |
+
+Tuning that escape window is the last thing to do, not the first.
 
 Parallel-safe: **01 + 08** (different places), **03 + 11** (assets vs rigs), **12** with anything.
 

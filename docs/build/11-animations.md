@@ -141,8 +141,9 @@ checklist, the human uploads.
 
 - **Buy or author?** Roblox's animation library and marketplace packs could cover locomotion cheaply; task
   animations almost certainly must be authored. Decide per section before job 2.
-- **Is the shared humanoid rig confirmed** for players, NPC crew, pirates and drowned? This decision
-  changes the total clip count by roughly a third.
+- ~~Is the shared humanoid rig confirmed?~~ **Decided: yes** — one R15 skeleton for players, crew,
+  pirates and drowned, decision [0015](../decisions/0015-shared-humanoid-rig.md). The clip counts in this
+  group assume it, and crew reuse the player task set.
 - **How much does the sea-motion layer cost** on mobile, with several characters swaying additively?
   Measure before committing to it everywhere.
 - **Do we need first-person arm animations** for the contextual first-person modes, or is the third-person

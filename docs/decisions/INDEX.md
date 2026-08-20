@@ -13,3 +13,7 @@
 - [0011 — Multiplayer permanent progression belongs to every participant](0011-shared-expedition-rewards.md)
 - [0012 — Parts/components are primary permanent fleet progression](0012-parts-progression.md)
 - [0013 — Lobby place and game place](0013-two-places-lobby-and-game.md)
+- [0014 — The storm damages, it does not instantly end the run](0014-storm-consequence.md)
+- [0015 — One shared humanoid R15 rig](0015-shared-humanoid-rig.md)
+- [0016 — Island templates are a TerrainRegion plus a prop Model](0016-island-template-storage.md)
+- [0017 — NPCs navigate the vessel in its own local space](0017-vessel-local-navigation.md)

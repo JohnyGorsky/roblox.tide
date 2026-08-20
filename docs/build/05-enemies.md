@@ -139,10 +139,11 @@ enemies arrive *as a threat* rather than trickling in single file.
 
 ## Open questions
 
-- **Deck pathfinding on a moving vessel.** Roblox pathfinding assumes a static navmesh. Boarders on a
-  pitching deck may need a bespoke solution — investigate early, because boarding depends on it.
+- ~~Deck pathfinding on a moving vessel.~~ **Decided:** a waypoint graph in the vessel's local space —
+  decision [0017](../decisions/0017-vessel-local-navigation.md). Shared with NPC crew, so build it once.
 - **Do enemies persist between nights?** A wounded serpent that comes back would be memorable.
 - **How much does night change existing enemies** versus introducing new ones? Reusing daytime enemies
   with night behaviour is far cheaper than new models.
-- **Rig sharing.** Pirates, drowned sailors and NPC crew are all humanoids — one shared R15 rig with
-  different clothing and animation sets would save an enormous amount of work. Confirm before job 4.
+- ~~Rig sharing.~~ **Decided:** one shared R15 rig — decision
+  [0015](../decisions/0015-shared-humanoid-rig.md). Pirates and drowned differ by clothing, shading,
+  movement style and audio, not skeleton.

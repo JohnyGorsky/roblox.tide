@@ -70,7 +70,7 @@ Named nights give players stories to tell.
 | Rain curtain / squall line | A moving wall of rain, also usable as wrap concealment | ⚠️ | studio |
 | Fog ramp per level | FogEnd/colour tied to intensity | ❌ | code |
 | Sea-state coupling | Storm level selects the sea state from group 01 | ❌ | code |
-| Caught-by-storm consequence | What actually happens at Level 4 — damage, or a run-ending grab | ❌ | code |
+| Caught-by-storm consequence | Escalating damage + system faults, escapable in ~30–60s (decision [0014](../decisions/0014-storm-consequence.md)) | ❌ | code |
 | Storm audio bed | Rumble, wind, rain-on-water, rain-on-metal, hull creaks | ⚠️ | sound |
 | Storm warning UI | Temporary HUD alert: `STORM FRONT: 0.8 KM` | ⚠️ | code |
 | Siren | The boat's own alarm when the storm closes | ⚠️ | sound |
@@ -125,8 +125,9 @@ it affordable.
 
 ## Open questions
 
-- **What does being caught by the storm actually do?** Damage over time, forced movement, or run-ending?
-  This is the single most important undecided rule in the game — the storm's whole authority rests on it.
+- ~~What does being caught by the storm actually do?~~ **Decided:** escalating damage, escapable if the
+  crew acts — decision [0014](../decisions/0014-storm-consequence.md). Tuning target is 30–60 seconds of
+  survivability inside The Wall.
 - **Is the storm distance visible as a number?** A HUD readout is clear; a purely visual/audible storm is
   more frightening. Perhaps radar shows it and the HUD does not.
 - **Can you shelter?** Island 10 is a "storm shelter". If sheltering works, the storm stops being a wall

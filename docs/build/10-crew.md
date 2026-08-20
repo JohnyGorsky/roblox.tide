@@ -47,7 +47,7 @@ Later, if useful: Quartermaster, Cook.
 | Task queue | What needs doing aboard, prioritised | ❌ | code |
 | Priority model | Flooding > engine > generator > hull > radar > minor | ❌ | code |
 | Interaction point alignment | Walk to, face correctly, hand IK onto the tool | ❌ | code |
-| Deck navigation | Pathfinding on a **moving, pitching** vessel — the hard problem, shared with boarding | ❌ | code |
+| Deck navigation | **Waypoint graph in the vessel's local space** (decision 0017) — not a navmesh. Shared with boarding | ❌ | code |
 | Task execution | Play the animation and *actually* perform the validated action | ❌ | code |
 | Task interruption | Stop when something more urgent happens, resume sensibly | ❌ | code |
 | Station occupancy | Two crew must not fight over one wheel | ❌ | code |
@@ -62,7 +62,7 @@ Later, if useful: Quartermaster, Cook.
 
 | Item | What it is | GB | Source |
 |---|---|---|---|
-| Crew rig | **Share the humanoid R15 rig** with pirates and drowned — huge saving | ⚠️ | meshy |
+| Crew rig | The **shared humanoid R15 rig** ([decision 0015](../decisions/0015-shared-humanoid-rig.md)) — so crew reuse the player task animations | ⚠️ | meshy |
 | Role outfits | 7 visually distinct working outfits | ⚠️ | meshy |
 | Face/head variation | So the crew are individuals, not clones | ⚠️ | meshy |
 | Name generation | Plausible maritime names | ❌ | code |
@@ -95,7 +95,9 @@ Authored, event-driven lines. This is what makes a crew feel alive for very litt
 
 1. **Crew foundation** — B's task queue, priority model, interaction alignment, deck navigation. One
    Engineer NPC that repairs one breach, properly. Feature 0009.
-2. **Deck navigation** — if it proves hard (likely), its own job. Shared with boarding in group 05.
+2. **Deck navigation** — author the per-vessel waypoint graph (decision
+   [0017](../decisions/0017-vessel-local-navigation.md)). Shared with boarding in group 05, so build it
+   once.
 3. **Core roles** — Navigator, Gunner, Deckhand, using the foundation.
 4. **Medic & revive** — pairs with the downed/death model from group 02/09.
 5. **Orders** — the order set and its touch-friendly UI.
