@@ -85,6 +85,8 @@ why: [decision 0013](../../../docs/decisions/0013-two-places-lobby-and-game.md).
 
 ## Where to read (start here)
 
+0. **[docs/HANDOFF.md](../../../docs/HANDOFF.md)** — resuming after a break? Start here: current
+   state, anything unsaved in Studio, and what is blocked on the user.
 1. [docs/INDEX.md](../../../docs/INDEX.md) — the map of everything below.
    For "what do we build next?" go straight to the **[build manifest](../../../docs/build/README.md)**
    (12 groups, ~600 items) and the generated **[BUILD-STATUS.md](../../../BUILD-STATUS.md)** board.

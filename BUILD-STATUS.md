@@ -64,13 +64,19 @@
 |---|---|---|---|---|
 | `#....` | [Player Task Animations](docs/features/0007-player-task-animations/feature.md) | GAME-0007 | PLANNED | P0 |
 
+### infra
+
+| | Feature | Id | Status | Pri |
+|---|---|---|---|---|
+| `#....` | [Admin Panel & Dev Tools](docs/features/0012-admin-panel/feature.md) | GAME-0012 | PLANNED | P1 |
+
 ## Roll-up
 
 | Status | Features |
 |---|---|
-| PLANNED | 10 |
+| PLANNED | 11 |
 | IN_PROGRESS | 1 |
-| **total** | **11** |
+| **total** | **12** |
 
 ## The build manifest - what actually needs making
 
@@ -90,6 +96,7 @@ Groups are sized to be taken one at a time. See [docs/build/README.md](docs/buil
 | [10 — NPC crew](docs/build/10-crew.md) | the AI crew who fill empty roles so a small party can sail a big ship, without making human players redundant. | ~40 |
 | [11 — Animations](docs/build/11-animations.md) | every animation in the game — the player's working set, storm reactions, and the per-enemy sets. | ~44 player/shared clips + ~90 enemy clips + 9 system pieces |
 | [12 — Audio](docs/build/12-audio.md) | the sound of a cold ocean at night — ambience, machinery, weather, creatures, and the music that knows when to stop. | ~96 sounds + 12 system pieces |
+| [13 — Admin panel & dev tools](docs/build/13-admin-tools.md) | an admin button visible only to authorised developers, opening a panel that can drive the game's systems directly — sea state, time, storm, spawning, item granting. | ~34 |
 
 ## Assets
 
@@ -112,6 +119,7 @@ _None registered._ Anything grey standing in for real art belongs here - see
 - [x] **005** Build tracking board and graybox register
 - [x] **006** Write the build manifest
 - [x] **007** Build the sea: ocean terrain and sea-state presets
+- [x] **008** Add admin panel to the build plan
 
 An unchecked job is still in flight.
 

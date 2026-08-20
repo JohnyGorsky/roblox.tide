@@ -1,5 +1,10 @@
 # Documentation Index
 
+## Where we left off
+
+- **[HANDOFF.md](HANDOFF.md)** — current state, what is unsaved, what is waiting on the user, and the
+  recommended next move. Read this first when resuming.
+
 ## What to build, and where it stands
 
 - **[The build manifest](build/README.md)** — everything that has to be made, in 12 groups sized to take
