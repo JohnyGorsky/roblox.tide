@@ -1,7 +1,46 @@
 # Handoff — where we left off
 
-**Snapshot: 2026-08-20.** Pick up here, then read [BUILD-STATUS.md](../BUILD-STATUS.md) and
+**Snapshot: 2026-08-21.** Pick up here, then read [BUILD-STATUS.md](../BUILD-STATUS.md) and
 [docs/build/](build/README.md).
+
+## 🚤 Where the game actually is
+
+Five jobs landed in sequence (017–021) and the game now has a **sea, weather, a storm, a soundscape and a
+boat you can drive**. Everything below is measured in the engine rather than assumed.
+
+| | |
+|---|---|
+| **Sea** | Ocean + harbour, five sea states, wave field (`HeightAt`/`NormalAt`), skies sourced and approved |
+| **Weather** | Everyday weather drifts independently of the storm (decision 0020) — it may move wind, waves, rain and fog, and may **not** touch the sky, brightness or ambient. Verified byte-identical |
+| **Storm** | Advances 14 studs/s from 4200 → **arrives in exactly 5 minutes** stationary. Lightning, cloud wall astern, 5 escalating bands |
+| **Audio** | 9 channels through `AudioBed` — multi-voice, equal-power crossfade, random re-seek, detune. No music at all (decision 0021) |
+| **Boat** | Starter launch, MVP signed off. Floats on the wave field, steers like a rudder, heels through a turn, trims under power, burns fuel |
+
+**Read before touching vessel physics:**
+[finding 0019](../findings/0019-a-large-torque-applied-in-a-body-relativ.md) — a large torque in a
+body-relative frame leaks into every axis the body rotates about. It spun the hull 178° in 8 seconds with the
+wheel amidships, and made repeated measurements disagree between runs. Every force on the vessel is now
+`RelativeTo = World` with an explicitly aimed direction; **keep it that way.**
+
+**The kit property that must not be broken:** nothing on a vessel is tuned per hull. Buoyancy stiffness, drag,
+rudder authority and yaw damping are all *derived* from the spec's statements of intent (`draft`, `cruise`,
+`rudderLag`) plus the hull's own mass and inertia — verified exact from 4,200 to 90,000 mass. A hand-tuned
+constant on a later vessel destroys decision 0009's promise.
+
+## 🔧 How to drive and test it
+
+1. **Press Play.** Admins auto-spawn with a body, on the boat's deck (the game place keeps
+   `CharacterAutoLoads = false` — that governs *respawn*, and is deliberate).
+2. **F4** for the panel — 39 tools in 6 collapsible sections, `Vessel` first.
+3. Walk to the **helm console**, press **E**, then **W/S** throttle and **A/D** steer.
+
+Panel tools worth knowing: `Vessel → Buoyancy stability check` (reports converging/growing);
+`Vessel → Put me on the boat`; `Storm → Watch a full approach (10×)`; `Sea → Sea state` (pins an override so
+the world tick cannot clobber it); `Sea → Time of day`; `Audio → Solo one channel`.
+
+⚠️ **Studio Sync does not reach a running Play session** — the Server datamodel is a snapshot from when Play
+started. Every code change needs a Play restart. And **always stop Play if you started it**; if a start or stop
+has not taken effect in ~20 s, stop retrying and say so.
 
 ---
 
@@ -22,10 +61,14 @@ Both cameras read `Fixed`, so Studio has viewport control in each.
 
 ---
 
-## 🟡 Studio's start-play is wedged
+## 🟡 Start-play is unreliable (not wedged right now)
 
-The MCP reports *"start play hasn't finished yet"* while Studio reports Edit mode. Check for a modal
-dialog, or restart Studio. It blocks the last two admin checks:
+It has timed out and needed a Studio restart several times. Observed pattern: it jams when a request lands
+right after a long-running `execute_luau` (20–30 s sampling loops), so leave a gap or keep runs short. It has
+also returned `"Game Stopped"` while the state still read `Play`, settling a moment later — **the reply is not
+proof**; check `get_studio_state`, and if it disagrees, wait rather than firing again.
+
+Two admin checks are still outstanding because they need a stable multiplayer session:
 
 1. The panel builds **exactly once** (it built twice before the `.client.luau` → `.local.luau` fix; the
    fix is confirmed at instance level, not yet at runtime).
@@ -84,14 +127,15 @@ Nothing else in the place is script-generated; the ocean, harbour and spawn are 
 
 | # | What | Why |
 |---|---|---|
-| 1 | **Commit.** 4+ files uncommitted | Studio Sync is two-way: deleting an instance deletes the FILE. A mid-session commit is what saved `StormVFX` when a cleanup pattern matched it (finding 0015) |
-| 2 | **Listen to the audio bed** | Job 019 shipped nine channels whose balance no human has heard. Panel → Audio → *Audio status* lists every channel's live level |
-| 3 | **Decide how the storm hurts you** | Decision 0014 says escapable in 30–60s; nothing implements it. The storm is a spectacle until this exists |
-| 4 | **Unwedge Studio's Play** | Blocks the non-admin refusal check — the only outstanding admin verification |
-| 4 | **finding 0004** — game place is `Fully Open` | A stranger could deep-link into a running expedition |
-| 5 | **finding 0005** — Social Slots on the game place | A friend could drop into a 6-slot crew mid-run |
-| 6 | todo 0003 — measure `LightingStyle = Realistic` on a phone | You chose the expensive path; cost unmeasured |
-| 7 | todo 0001 / 0002 — `tide-style` skill; re-probe `StarterGui`/`StarterPack`/`Workspace` sync | Minor |
+| 1 | **Commit `docs/HANDOFF.md`** | The only uncommitted file. Studio Sync is two-way — deleting an instance deletes the FILE, and a mid-session commit is what saved `StormVFX` when a cleanup pattern matched it (finding 0015) |
+| 2 | **Decide how the ocean stops having an edge** — [finding 0018](../findings/0018-a-crew-can-reach-the-edge-of-the-bounded.md), high | Centre-to-edge is **2.8 min** at cruise; fuel lasts 3.0. The fuel tank is the only thing hiding the edge of the world, **by twelve seconds** — and faster vessels (group 02) and jerry cans (group 03) are both planned. Options are in the finding: grow the patch, recentre the world on the vessel, or fence it in fiction |
+| 3 | **Listen to the audio bed** | Nine channels whose balance no human has heard. Panel → Audio → *Audio status*, and *Solo one channel* to pick one out |
+| 4 | **Judge the boat's feel** | The numbers are right; whether she reads as a launch is your call. `cruise` is the dial, and `GAIN_PER_STUD` gets solved for whatever you pick — the 5-minute storm arrival is untouched either way |
+| 5 | **Two-player test** | The one thing blocking `GAME-0001` from `VERIFIED`: never driven with a second crew member aboard. Also blocks the non-admin refusal check |
+| 6 | **finding 0004 / 0005** — game place is `Fully Open`, Social Slots on | A stranger could deep-link into a running expedition; a friend could drop into a 6-slot crew mid-run |
+| 7 | todo 0003 — measure `LightingStyle = Realistic` on a phone | You chose the expensive path; cost unmeasured. Mobile helm controls are also written but never run on a touch canvas |
+| 8 | todo 0001 / 0002 — `tide-style` skill; re-probe `StarterGui`/`StarterPack`/`Workspace` sync | Minor |
+| 9 | Delete `ServerStorage.P2` and `SkyQuarantine` | Both dead. `P2` is a stale duplicate of `AdminTools` from commit `6617b24` |
 
 ---
 
