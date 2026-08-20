@@ -65,13 +65,13 @@ dialog, or restart Studio. It blocks the last two admin checks:
 
 ## Resuming after a Studio restart (read this first)
 
-Studio was closed on 2026-08-20 with job 018 complete and job 019 open. Nothing is lost — every source file
+Studio was closed on 2026-08-20 with jobs 018 and 019 both complete. Nothing is lost — every source file
 is on disk — but two things need checking before trusting what you see:
 
 1. **Re-verify Studio Sync.** [Finding 0007](../findings/0007-reopening-a-place-can-drop-the-studio-sy.md):
    reopening a place can silently drop the sync connection, so scripts look present while edits go nowhere.
-   Check a known module exists in `ReplicatedStorage` (there should be **12**), and that
-   `ServerScriptService` has **3** and `StarterPlayerScripts` **2**.
+   Check a known module exists in `ReplicatedStorage` (there should be **14**), and that
+   `ServerScriptService` has **3** and `StarterPlayerScripts` **2**. (14 after job 019.)
 
 2. **The `Clouds` layer is not backed by a file.** It was created over MCP in Edit, so if the place was
    closed without saving it is gone. This costs nothing — `WorldTick` recreates it on start if missing — but
@@ -84,8 +84,9 @@ Nothing else in the place is script-generated; the ocean, harbour and spawn are 
 | # | What | Why |
 |---|---|---|
 | 1 | **Commit.** 4+ files uncommitted | Studio Sync is two-way: deleting an instance deletes the FILE. A mid-session commit is what saved `StormVFX` when a cleanup pattern matched it (finding 0015) |
-| 2 | **Decide how the storm hurts you** | Decision 0014 says escapable in 30–60s; nothing implements it. The storm is a spectacle until this exists |
-| 3 | **Unwedge Studio's Play** | Blocks the non-admin refusal check — the only outstanding admin verification |
+| 2 | **Listen to the audio bed** | Job 019 shipped nine channels whose balance no human has heard. Panel → Audio → *Audio status* lists every channel's live level |
+| 3 | **Decide how the storm hurts you** | Decision 0014 says escapable in 30–60s; nothing implements it. The storm is a spectacle until this exists |
+| 4 | **Unwedge Studio's Play** | Blocks the non-admin refusal check — the only outstanding admin verification |
 | 4 | **finding 0004** — game place is `Fully Open` | A stranger could deep-link into a running expedition |
 | 5 | **finding 0005** — Social Slots on the game place | A friend could drop into a 6-slot crew mid-run |
 | 6 | todo 0003 — measure `LightingStyle = Realistic` on a phone | You chose the expensive path; cost unmeasured |

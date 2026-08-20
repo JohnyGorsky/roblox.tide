@@ -768,14 +768,34 @@ end
 
 tools.audioReport = {
 	id = "audioReport",
-	label = "Audio status (what is still silent)",
+	label = "Audio status (every channel)",
 	section = "Audio",
 	scope = "local",
 	controls = { kind = "button", output = "text" },
 	run = function(_player: Player, _args: any)
+		--[[
+			Both modules, in one readout. They are levelled from the same attributes, so seeing them side by
+			side is how you catch one of them disagreeing - and a silent channel here is diagnosable rather
+			than mysterious, which is the lesson of the VFX that never started (finding 0011).
+		]]
+		local lines = {}
 		local A = stormAudio()
-		if not A then return false, "StormAudio not found" end
-		return true, A.report()
+		if A then
+			table.insert(lines, "===== STORM (wind / rain / thunder) =====")
+			table.insert(lines, A.report())
+		else
+			table.insert(lines, "StormAudio not found")
+		end
+		table.insert(lines, "")
+		local ambMod = ReplicatedStorage:FindFirstChild("Ambience")
+		if ambMod then
+			local ok, Amb = pcall(require, ambMod)
+			table.insert(lines, "===== AMBIENCE (ocean / birds / storm bed) =====")
+			table.insert(lines, ok and Amb.report() or ("failed to load: " .. tostring(Amb)))
+		else
+			table.insert(lines, "Ambience not found")
+		end
+		return true, table.concat(lines, "\n")
 	end,
 }
 

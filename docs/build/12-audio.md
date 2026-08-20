@@ -19,7 +19,10 @@ sourcing: Pixabay (per the workspace asset policy) — every asset presented for
 > Search it by its own category vocabulary (`Thunder`, `Water - Surf`, `Boats - Bow Wash`); plain-language
 > searches return subway trains.
 >
-> First job: **[019](../../Jobs/019/intake.md)** — ambience mixer, ocean beds, storm bed, and the rain-clip swap.
+> First job: **[019](../../Jobs/019/intake.md)** — ✅ **delivered 2026-08-20.** `AudioBed` (the shared
+> anti-repetition machinery), `Ambience` (ocean calm/heavy, dead calm, birds, storm bed), the rain-clip swap,
+> and a panel readout covering every channel. Nine channels live, 16 concurrent voices — **unmeasured on a
+> phone**, and voice count is the first thing to tier down.
 
 ## Why this group punches above its weight
 

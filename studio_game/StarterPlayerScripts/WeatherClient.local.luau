@@ -29,6 +29,7 @@ local StormVFX = require(ReplicatedStorage:WaitForChild("StormVFX"))
 local LightningVFX = require(ReplicatedStorage:WaitForChild("LightningVFX"))
 local CloudWallVFX = require(ReplicatedStorage:WaitForChild("CloudWallVFX"))
 local StormAudio = require(ReplicatedStorage:WaitForChild("StormAudio"))
+local Ambience = require(ReplicatedStorage:WaitForChild("Ambience"))
 
 --[[
 	Rain and spray follow the camera, so they need a camera. In a fresh session the CurrentCamera can be nil
@@ -41,6 +42,7 @@ end
 StormVFX.start()
 CloudWallVFX.start()
 StormAudio.start()
+Ambience.start()
 
 --[[
 	Prime the cloud bank.
@@ -73,6 +75,7 @@ end)
 task.spawn(function()
 	while true do
 		StormAudio.step(0.1)
+		Ambience.step(0.1)
 		task.wait(0.1)
 	end
 end)

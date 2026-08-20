@@ -139,7 +139,7 @@ that exist in Studio but were never registered.
 - [x] **016** Day/night cycle with severity-based weather composition
 - [x] **017** Storm core: position, intensity, and the server tick
 - [x] **018** Finish the storm's presence: time scale, lightning, cloud wall, audio
-- [ ] **019** Living-world audio: ambience mixer, ocean beds, storm bed
+- [x] **019** Living-world audio: ambience mixer, ocean beds, storm bed
 
 An unchecked job is still in flight.
 

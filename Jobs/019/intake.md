@@ -2,7 +2,7 @@
 
 **Project**: `roblox.tide`
 **Created**: 2026-08-20 16:40:44
-**Status**: Requirements Gathering (intake)
+**Status**: ✅ Completed
 
 ## Requirements / goal
 
@@ -10,7 +10,7 @@ Group 12's P0 half - everything that needs no vessel - raised to P0 on the user'
 
 ## Checklist
 
-- [ ] Requirements reviewed (this intake)
-- [ ] Implementation plan created & agreed
-- [ ] Implementation completed
-- [ ] Final summary + changelog written
+- [x] Requirements reviewed (this intake)
+- [x] Implementation plan created & agreed
+- [x] Implementation completed
+- [x] Final summary + changelog written
