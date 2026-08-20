@@ -101,12 +101,27 @@ end
 --[[
 	Flash strength from magnitude and distance.
 
-	Falls off with distance but never to nothing - a far strike still lights the cloud base, and on a sea
-	with no landmarks that distant glow is most of what tells you the sky has depth.
+	--------------------------------------------------------------------------------------------------
+	DISTANT STRIKES LIGHT THE WAY. THAT IS A FEATURE, NOT A SIDE EFFECT.
+
+	The falloff is deliberately much gentler than inverse-square, and the first version was wrong about this:
+	a linear falloff left a 2.4 km strike at about a quarter of a close one, which is physically defensible
+	and useless. On an unlit ocean at night, distant lightning is the ONLY thing that shows the crew the shape
+	of the world - the horizon, the cloud base, the sea going on. A flash you can see but cannot see BY is
+	just a white frame.
+
+	So: a square-root curve plus a high floor. A far strike lands around half the punch of a near one rather
+	than a quarter, and the light it throws is enough to steer by for an instant.
+
+	It is also true to life for the wrong-sounding reason: what a distant strike lights is not the ground near
+	you, it is the whole cloud base above you, and that is a huge area source. Distant sheet lightning really
+	does illuminate a landscape.
 ]]
 function Lightning.flashExposure(strike: Strike): number
 	local near = math.clamp(1 - (strike.distance / Lightning.DISTANCE_FAR), 0, 1)
-	return (0.25 + 1.35 * near) * (0.4 + 0.6 * strike.magnitude)
+	-- sqrt: decays slowly at first, so most of the useful range stays bright
+	local eased = math.sqrt(near)
+	return (0.45 + 1.15 * eased) * (0.4 + 0.6 * strike.magnitude)
 end
 
 --[[

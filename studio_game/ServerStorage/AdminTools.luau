@@ -587,13 +587,13 @@ tools.stormReport = {
 ]]
 tools.vfxReport = {
 	id = "vfxReport",
-	label = "Rain / spray / cloud wall status",
+	label = "Rain / spray / wall / lightning status",
 	section = "Storm",
 	scope = "local",
 	controls = { kind = "button", output = "text" },
 	run = function(_player: Player, _args: any)
 		local lines = {}
-		for _, name in ipairs({ "StormVFX", "CloudWallVFX" }) do
+		for _, name in ipairs({ "StormVFX", "CloudWallVFX", "LightningVFX" }) do
 			local m = ReplicatedStorage:FindFirstChild(name)
 			if not m then
 				table.insert(lines, name .. ": module not found")
@@ -673,6 +673,38 @@ tools.stormApproach = {
 		workspace:SetAttribute("TimeScale", scale)
 		return true, ("front reset to %.1f km and clock at %dx. It arrives in ~%.0fs - watch ASTERN.\nRemember to set the scale back to 1x before judging balance.")
 			:format(SF.distanceKm(), scale, SF.START_DISTANCE / (SF.ADVANCE_RATE * scale))
+	end,
+}
+
+--[[
+	Point the camera at the storm.
+
+	Sounds trivial; it is not. The wall only exists astern (bearing 180, i.e. -Z) and there is no vessel, no
+	compass and no landmark in the place yet, so "look astern" is not a thing a tester can actually DO - and
+	a wall you happened to be facing away from is indistinguishable from a wall that is not being drawn.
+	That ambiguity cost a full round of debugging.
+]]
+tools.faceStorm = {
+	id = "faceStorm",
+	label = "Face the storm (look astern)",
+	section = "Storm",
+	scope = "local",
+	controls = { kind = "button", output = "text" },
+	run = function(player: Player, _args: any)
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if not root or not root:IsA("BasePart") then
+			return false, "no character - press Play first"
+		end
+		--[[
+			Turn the CHARACTER rather than the camera. The camera follows the character in Play, so writing
+			Camera.CFrame from the server is pointless - the camera script overwrites it the same frame.
+		]]
+		local position = root.Position
+		root.CFrame = CFrame.lookAt(position, position + Vector3.new(0, 0, -1))
+		local distance = workspace:GetAttribute("StormDistance")
+		return true, ("turned to face bearing 180 (-Z), where the front is.\nstorm %s studs out; the wall is drawn well inside the fog of that.")
+			:format(typeof(distance) == "number" and ("%.0f"):format(distance) or "?")
 	end,
 }
 

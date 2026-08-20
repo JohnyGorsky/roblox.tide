@@ -220,9 +220,79 @@ local function drawBolt(strike: Lightning.Strike, origin: Vector3)
 		previous = nextPoint
 	end
 
-	-- Two frames, then gone. A bolt that lingers reads as a prop.
+	--[[
+		🔴 THE FLARE AT THE STRIKE POINT.
+
+		Added because the light was only visible ABOVE the player and not where the bolt actually hit. The
+		cause: a `PointLight` on the bolt caps at 120 studs of range, and a strike 400-2600 studs away has
+		almost nothing within 120 studs of it to light - just open water, which barely responds. So the bolt
+		was a bright thin line with no glow around it, and all the visible response came from the
+		camera-local light overhead.
+
+		The fix is not more light range - the cap is the cap. It is an emissive BODY at the waterline: a large
+		Neon sphere, extremely brief, which reads as the strike blowing a hole of light in the murk. At
+		distance that glowing mass IS the strike, far more than the bolt line is.
+
+		Neon rather than a light because Neon does not care about range at all - it is surface emission, so it
+		is just as bright at 2600 studs as at 200. That is exactly the property needed here.
+	]]
+	local flare = Instance.new("Part")
+	flare.Name = "Flare"
+	flare.Shape = Enum.PartType.Ball
+	flare.Anchored = true
+	flare.CanCollide = false
+	flare.CanQuery = false
+	flare.CanTouch = false
+	flare.CastShadow = false
+	flare.Material = Enum.Material.Neon
+	flare.Color = BOLT_PALE
+	-- scales with distance so it holds a roughly constant ANGULAR size; a fixed radius vanishes far away
+	local flareRadius = (55 + 70 * strike.magnitude) * (0.6 + strike.distance / 1600)
+	flare.Size = Vector3.one * flareRadius
+	flare.Transparency = 0.25
+	flare.Position = base + Vector3.new(0, flareRadius * 0.25, 0)
+	flare.Parent = model
+
+	-- and a real light at the strike, for the water immediately around it
+	local strikeLight = Instance.new("PointLight")
+	strikeLight.Color = BOLT_PALE
+	strikeLight.Range = LIGHT_RANGE
+	strikeLight.Brightness = 12 + 12 * strike.magnitude
+	strikeLight.Shadows = false
+	strikeLight.Parent = flare
+
+	--[[
+		The flare collapses rather than simply vanishing, over about twice the bolt's own life. A glow that
+		shrinks reads as a discharge dissipating; one that blinks out reads as a part being deleted.
+	]]
+	task.spawn(function()
+		local life = 0.22 + 0.10 * strike.magnitude
+		local steps = 7
+		for i = 1, steps do
+			local k = 1 - i / steps
+			flare.Size = Vector3.one * flareRadius * (0.35 + 0.65 * k)
+			flare.Transparency = 0.25 + 0.75 * (1 - k)
+			strikeLight.Brightness = (12 + 12 * strike.magnitude) * k
+			task.wait(life / steps)
+		end
+		if flare.Parent then
+			flare:Destroy()
+		end
+	end)
+
+	-- The BOLT itself is two frames, then gone. A bolt that lingers reads as a prop.
 	task.delay(0.09 + 0.06 * math.random(), function()
-		model:Destroy()
+		for _, seg in ipairs(model:GetChildren()) do
+			if seg.Name ~= "Flare" then
+				seg:Destroy()
+			end
+		end
+	end)
+	-- then the model once the flare has finished with it
+	task.delay(0.9, function()
+		if model.Parent then
+			model:Destroy()
+		end
 	end)
 end
 
@@ -382,9 +452,29 @@ end
 function LightningVFX.reset()
 	ourExposure = 0
 	table.clear(liveFlashes)
-	if baselineExposure ~= nil then
-		Lighting.ExposureCompensation = baselineExposure :: number
+	restoreLight() -- all THREE channels, not just exposure
+	if flashLightPart then
+		flashLightPart:Destroy()
 	end
+	flashLight, flashLightPart = nil, nil
+end
+
+--- What the light channels are doing right now, for the panel.
+function LightningVFX.report(): string
+	return table.concat({
+		("live flashes    %d"):format(#liveFlashes),
+		("exposure        %+.3f  (baseline %+.3f)"):format(
+			Lighting.ExposureCompensation, baselineExposure or Lighting.ExposureCompensation),
+		("ambient         %d,%d,%d  (baseline %s)"):format(
+			Lighting.Ambient.R * 255, Lighting.Ambient.G * 255, Lighting.Ambient.B * 255,
+			baselineAmbient and ("%d,%d,%d"):format(
+				(baselineAmbient :: Color3).R * 255, (baselineAmbient :: Color3).G * 255,
+				(baselineAmbient :: Color3).B * 255) or "not captured yet"),
+		("point light     %s  brightness %.2f  range %d"):format(
+			flashLight and tostring(flashLight.Enabled) or "not built",
+			flashLight and flashLight.Brightness or 0,
+			flashLight and flashLight.Range or 0),
+	}, "\n")
 end
 
 return LightningVFX

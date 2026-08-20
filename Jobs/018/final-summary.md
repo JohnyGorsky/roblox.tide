@@ -2,7 +2,7 @@
 
 **Project**: `roblox.tide`
 **Completed**: 2026-08-20
-**Status**: ✅ Completed (audio partially — two slots deliberately left empty, see below)
+**Status**: ✅ Completed
 
 ## What was implemented
 
@@ -75,16 +75,109 @@ true distance: at intensity 2 fog ends near 2260 while the front may still be 25
 would be invisible and the warning would arrive too late. It grows in height as it closes, because angular
 size is what a person reads as "approaching" — a mass that darkens without growing reads as nightfall.
 
-**AUDIO**, partially. Wind is live on two layers crossfaded, both assets we already own and had already
-scanned, so no approval round was needed; the registry note that `wind_rush` must fade in is honoured by it
-being silent below wind 0.35. Rain and thunder are **empty slots holding `""`, not placeholder ids** — a
-wrong rumble is much harder to notice than a missing one, and placeholders are how the wrong sound ships.
-`missing()` reports them and the panel prints them on start so they cannot be forgotten. Both are
-addressable at runtime via a new free-text panel control, so a candidate can be heard *under the live wind
-bed at the storm's own volume curve* rather than judged alone on a store page.
+**AUDIO** — four channels, all live, all ours. The user uploaded rain (`133061174808986`) and thunder
+(`88316151105164`) mid-job; wind reuses two Jungle assets already scanned and logged, and the registry note
+that `wind_rush` must fade in is honoured by it being silent below wind 0.35.
 
-**NOT DONE**: the two audio clips (the user offered to source them; spec is in the shared registry), and
-screen-level rain streaks. The thunder timing is already live and testable without a single sound file.
+The interesting problem was the user's note that the wind **felt repetitive** — correctly, and it was not
+the clip's fault. Ambient wind is the worst possible case for looping: there is no rhythm or melody for the
+ear to attach to, so the only structure it *can* latch onto is the loop period itself, and once heard it
+cannot be unheard. Three techniques stacked, each attacking a different giveaway. Several voices per layer,
+**equal-power** crossfaded — verified the sum of squared gains is exactly 1.000000 at every phase for both 2
+and 4 voices, because normalising amplitudes instead would dip the bed at each handover, a quieter but
+equally recognisable artefact than the seam being removed. Random **re-seek** while a voice is silent, which
+is what actually kills the periodicity. And a fixed per-voice detune plus a shared slow ±4% drift on periods
+sharing no factors, so no two layers hand over together. Plus **gusts**: short sharper one-shots at
+randomised intervals whose frequency and strength scale with wind, so the bed has events in it and not only
+texture — reusing the wind clips at raised pitch, which is what a gust actually is.
+
+Then a measurement that changed the design: **the rain clip is 1.54 s**, against 13.4 s and 19.0 s for the
+wind. A 1.5-second loop is normally the most audible thing in a mix, and re-seeking barely helps because
+there is only ~1.2 s to seek within. What rescues it is that rain is broadband *noise*, which survives
+pitch-shifting almost unnoticed where wind would sound like a machine spinning up. So rain gets **4 voices
+at ±13% detune** against wind's 2 at ±1.5–2%; the four effective periods land at 1.77/1.61/1.48/1.36 s and
+drift permanently out of phase. Logged in the registry as compensation rather than preference — a 6–15 s
+recording should replace it if one turns up.
+
+**LIGHTNING LIGHT.** The user's second note: the flash needed *more light attached*, and this was a real
+design error rather than a tuning one. `ExposureCompensation` is a **tonemap** — it rescales the frame that
+was already rendered, so everything brightens by the same proportion and nothing is actually *lit*. A dark
+deck stayed a flat dark shape, only paler, which the eye reads as the gamma being nudged rather than as the
+sky going off. Fixed by driving three channels together: exposure for the frame-wide response,
+**`Lighting.Ambient`** for real global illumination that reaches into shadow, and a **`PointLight`** near the
+camera offset toward the strike so surfaces closest to the crew catch it hardest — falloff is what sells a
+light as having a position. Plus PointLights on the bolt's lower segments so it glows *into* the fog instead
+of being a bright shape drawn on top of it. `Ambient` was verified free: `compose()` writes `OutdoorAmbient`
+(the sky-lit term) and never `Ambient` (the floor applied everywhere), so lightning can own it outright and
+there is still exactly one writer per property. Measured on a close strike: exposure −0.050 → +1.215,
+ambient 0.275 → 0.924, point light 17.7 at the engine's 120-stud range cap, bolt lights 9.6/12.8/16.0
+brightening toward the waterline; a 2400-stud strike lifts ambient to only 0.376. All three hand back exactly
+to baseline.
+
+**TWO CORRECTIONS AFTER THE USER TESTED**, both real defects rather than tuning.
+
+*"I did not see any wall approaching."* The wall was pinned at 82% of `FogEnd`, on the reasoning that it had
+to stay inside the fog to be visible. It rendered perfectly and was invisible: fog opacity ramps linearly
+from clear at `FogStart` to solid at `FogEnd`, so 82% of the way to FogEnd is **~81% occluded** - the wall was
+being erased by the air in front of it. Measured across the bands: 81% / 81% / 63% / 52% / 44%, so at exactly
+the two distances a crew watches an approach from, it was gone while every value in its own report read
+correct. Now placed by **target occlusion** - `FogStart + 0.35 x (FogEnd - FogStart)` - which holds a constant
+35% at every band, and is robust in a way no fraction of FogEnd can be because `FogStart` moves independently
+per sea state (Dead Calm 200, The Wall 10). Opacity raised too (floor 0.62 -> 0.46, since fog is already
+thinning it), and the intensity gate dropped for a faint smudge from 4.2 km - it is the crew's *early* tell
+and it was showing nothing for the first stretch. Occlusion is now in the wall's report, because "invisible
+while all settings read correct" is otherwise very hard to diagnose. Finding 0014, high.
+
+*"Distance lightning that lights my way."* The falloff was linear, leaving a 2.4 km strike at about a quarter
+of a close one - physically defensible and useless. On an unlit ocean, distant lightning is the only thing
+that shows the crew the shape of the world, and a flash you can see but cannot see *by* is just a white
+frame. Now a square-root curve with a high floor: **+117% at 2400 studs, +51% at 1600, and only +4% up close**,
+so the near end is untouched and the far end becomes usable light. It is also true to life for a
+counter-intuitive reason - what a distant strike lights is not the ground near you but the whole cloud base
+above you, which is an enormous area source.
+
+**THE WALL TOOK THREE ATTEMPTS**, and the third is the one that should have been first.
+
+The user reported "no wall at all", twice. Attempt one placed it at 82% of `FogEnd`, which is ~81% occluded -
+the fog in front erased it (finding 0014). Attempt two fixed the placement and it was *still* invisible, with
+every reported value correct: emitter enabled, rate 11, particles 447-761 studs, colour, position, 35%
+occlusion, all fine. The cause was that the emitter part was parented to `workspace.CurrentCamera` at ~1000
+studs, copying the pattern `StormVFX` uses for rain. That pattern is right for rain because rain sits a few
+tens of studs from the lens - it is a **viewmodel** technique - and wrong for a kilometre-distant world-scale
+object (finding 0016).
+
+The real mistake was betting an important silhouette entirely on one uncertain rendering mechanism.
+Rewritten **geometry first**: nine anchored slabs in Workspace forming a 200-degree arc, which are guaranteed
+to render, with particles demoted to churn on the top edge so the silhouette is ragged rather than a clean
+rectangle. If the particles fail for any reason, the wall is still there.
+
+Two supporting facts found on the way: `Part.Size` silently **clamps at 2048** studs (asking 3000 returns
+2048), so a horizon-spanning wall must be several parts; and a *narrow* wall is indistinguishable from a
+missing one when the tester has no compass, which is why the arc is 200 degrees and there is now a
+**Face the storm** tool. That ambiguity alone cost a full round of debugging.
+
+Presence at phase 1 also raised on the user's instruction - a power curve puts intensity 1 at **0.56** rather
+than the 0.34 a linear ramp gave. At that level the wall is 4344 studs wide and subtends **41 degrees of
+elevation** from sea level.
+
+**LIGHT AT THE STRIKE.** The user's report that "only above me is working, not where lightning strikes" was
+precise and correct. A `PointLight` on the bolt caps at 120 studs of range, and a strike 400-2600 studs away
+has almost nothing within 120 studs to light - just open water, which barely responds. So all the visible
+response came from the camera-local light overhead. The fix is not more range, because the cap is the cap: it
+is an emissive **body** at the waterline, a large Neon sphere that collapses over ~0.3 s. Neon is surface
+emission and so does not fall off with distance at all - measured 13.7 degrees wide at 400 studs, 7.3 at 1200,
+5.7 at 2400 - which is exactly the property needed. At distance that glowing mass *is* the strike, far more
+than the bolt line is.
+
+**AND ONE SELF-INFLICTED INCIDENT.** A name-matched cleanup of test artefacts destroyed
+`ReplicatedStorage.StormVFX` - the real module. Because **Studio Sync is two-way**, that also deleted
+`studio_game/ReplicatedStorage/StormVFX.luau` from disk, outside Studio's undo stack. Recovered with
+`git checkout HEAD` and only because the user had committed mid-session; without that commit a whole module
+was gone. Cleanup is now an explicit allowlist scoped to Workspace and SoundService and never touches the
+containers where real code lives. Finding 0015, high, plus a persistent memory - deleting an instance in a
+synced place is a destructive filesystem operation, not a scene tidy.
+
+**NOT DONE**: screen-level rain streaks.
 
 ### Files changed
 
@@ -121,6 +214,13 @@ Start with **Watch a full approach → 30 seconds (10×)**, then turn round and 
 
 ```text
 LocalWeather.WIND_MAX        0.45   ceiling on an ordinary day — the safety property
+LightningVFX AMBIENT_GAIN    0.55   how hard a strike lights the world. THE dial for flash strength
+Lightning.flashExposure      floor 0.45 + 1.15*sqrt(near) - raise the FLOOR for more distant light
+CloudWallVFX TARGET_OCCLUSION 0.35  how much fog sits in front of the wall. >0.6 and it disappears
+CloudWallVFX PRESENCE_CURVE  0.55   lower = more wall earlier. Phase 1 currently lands at 0.56
+CloudWallVFX ARC_DEGREES     200    narrower is prettier and much easier to miss entirely
+LightningVFX LIGHT_GAIN      14     the local PointLight; range caps at 120 studs engine-side
+StormAudio VOICES[x].spread  detune width — wider for short clips, narrow for long ones
 LocalWeather.SHOWER_THRESHOLD 0.72  15% wet. 0.62 gave 30%, which was a wet climate
 WaveField blend               9 s   the whole transition, every channel
 Lightning RATE_PER_MINUTE     2/9/22  the GAP between strikes is what is felt
@@ -129,6 +229,7 @@ Lightning.SOUND_STUDS_PER_SECOND 300  legibility, not physics — do not "correc
 
 ### Open
 
-- Rain and thunder clips (spec in `Assets/registry/audio.md`)
 - Whether the particle wall reads as cloud or as smoke — the escalation is a textured arc
+- A longer rain recording (6–15 s) would let the voice count drop from 4 to 2
+- `PointLight.Shadows = true` on the camera-local flash light is a mobile tier-down candidate; unmeasured
 - Non-admin refusal end-to-end test still needs a stable Play session
