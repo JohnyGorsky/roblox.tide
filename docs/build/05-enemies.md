@@ -48,7 +48,7 @@ place to defend. Prioritise it.
 | Enemy | Stage | What it breaks | Anims | GB | Source |
 |---|---|---|---|---|---|
 | Drowned sailor | Mid | Boards from below; silent, ignores lights | 7 | ⚠️ | meshy |
-| Siren | Mid–Late | **Corrupts radar and navigation** — false contacts, wrong headings | 6 | ⚠️ | meshy |
+| Siren | Mid–Late | **Corrupts radar and charts** — false contacts, wrong positions. ⚠️ **Never the compass**: it is deliberately indestructible and untargetable (storm system doc), because it is the only way out of The Wall | 6 | ⚠️ | meshy |
 
 ## D. Sea monsters — 4 enemies
 

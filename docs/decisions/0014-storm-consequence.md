@@ -37,4 +37,9 @@ most alive.
 - Vessel loss needs a defined outcome: what happens to the crew, and what permanent progress is kept —
   see [0008](0008-progression-model.md) and [0011](0011-shared-expedition-rewards.md).
 - The damage curve must be steep enough that lingering is never a shortcut for extra looting.
+- **The Wall is a blind-navigation state.** Inside it the sky is a black void and fog closes at ~330
+  studs, so every visual heading cue is gone and the crew steers by **compass and chart alone** (added
+  2026-08-20). This makes the escape a navigation problem, not only a throttle-and-repair problem — and
+  it is what the diegetic instruments in group 02 exist for. Consequence: the compass and chart must be
+  **self-lit and readable in darkness**, and the HUD must never show a heading, or the blindness is free.
 - Manifest group [07](../build/07-atmosphere.md) owns the implementation.

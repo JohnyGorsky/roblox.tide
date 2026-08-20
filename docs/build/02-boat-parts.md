@@ -68,7 +68,7 @@ Decision: boat information lives **on the boat**, not the HUD. These are the rea
 | Fuel gauge | The most-watched dial in the game | ✅ | studio |
 | Engine condition gauge | Health as a dial, not a bar | ✅ | studio |
 | Hull condition gauge | Ditto | ✅ | studio |
-| Compass | Heading. Physical, readable from the wheel | ✅ | studio |
+| Compass | Heading. Physical, readable from the wheel. **The one system that can never fail** — indestructible and untargetable by design, because it is the only way out of The Wall. ⚠️ **Must be self-lit and legible in total darkness** — inside The Wall it is one of only two navigation instruments left (decision 0014). Graybox is *not* fine here: if it cannot be read in the dark it fails its most important job | ⚠️ | studio |
 | Ignition / starter | Start sequence with a cough-and-catch sound | ✅ | studio |
 | Horn / siren | Signalling, and the storm alarm | ❌ | sound |
 | Red emergency lamp | Hull critical / severe fault. World feedback over HUD text | ✅ | studio |
@@ -107,7 +107,7 @@ The generator is the shared power budget. Crew turning systems off under pressur
 | Radar mast | Carries the antenna high | ⚠️ | studio |
 | **Radar antenna** | **Must be a separate rotating part** — already noted in the asset registry | ⚠️ | meshy |
 | Radar screen / station | The sweep display. A crew position | ⚠️ | studio |
-| Chart table | Where the wider map is read | ⚠️ | studio |
+| Chart table | Where the wider map is read. ⚠️ **Needs its own lamp**: with the radar degraded inside The Wall, the chart is the other half of blind navigation | ⚠️ | studio |
 | Nautical chart prop | The physical chart on it | ✅ | studio |
 | Binoculars | Tool; contextual first-person (decision 0001) | ✅ | meshy |
 | Radio set | Distress calls, story signals, ghost transmissions | ✅ | meshy |

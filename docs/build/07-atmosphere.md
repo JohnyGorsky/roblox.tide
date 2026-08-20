@@ -71,6 +71,9 @@ Named nights give players stories to tell.
 | Fog ramp per level | FogEnd/colour tied to intensity | ❌ | code |
 | Sea-state coupling | Storm level selects the sea state from group 01 — which carries the water **and** Atmosphere values, so the sea recolours as the weather turns | ❌ | code |
 | Caught-by-storm consequence | Escalating damage + system faults, escapable in ~30–60s (decision [0014](../decisions/0014-storm-consequence.md)) | ❌ | code |
+| **Blind-navigation state** | Inside The Wall: black void sky, ~330-stud fog, every visual heading cue gone. Crew steers by compass and chart alone | ❌ | code |
+| **Compass exempt from all damage** | The compass never fails, and nothing targets it — it is the floor beneath pillar 6, guaranteeing the crew is never unable to leave | ❌ | code |
+| **Radar kill inside The Wall** | Radar goes **out**, not flickery. A working-but-noisy radar lets the crew squint through the blindness and collapses the moment into a lesser Storm | ❌ | code |
 | Storm audio bed | Rumble, wind, rain-on-water, rain-on-metal, hull creaks | ⚠️ | sound |
 | Storm warning UI | Temporary HUD alert: `STORM FRONT: 0.8 KM` | ⚠️ | code |
 | Siren | The boat's own alarm when the storm closes | ⚠️ | sound |
