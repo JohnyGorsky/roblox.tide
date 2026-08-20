@@ -56,6 +56,8 @@ local state = {
 	damping = 0,
 	drag = 0,
 	maxDepth = 0,
+	seat = nil :: Seat?,
+	driver = nil :: Player?,
 	throttle = 0,
 	steer = 0,
 	engineOn = true,
@@ -175,6 +177,58 @@ local function buildVessel()
 	yaw.Parent = hull
 	state.yaw = yaw
 
+	--[[
+		THE HELM SEAT.
+
+		🔴 A plain `Seat`, NOT a `VehicleSeat` (decision 0022).
+
+		`VehicleSeat` would hand throttle and steering to us for free, and on mobile it would supply the touch
+		controls too. It also hands NETWORK OWNERSHIP to the driver on sit - which is exactly the condition
+		that makes a server-side buoyancy loop pump energy instead of removing it, and is why the Jungle boat
+		bounced higher and higher while driven. So we take the plain seat and build the input ourselves.
+
+		WELDED, never anchored. Anchoring any part of an assembly splits it and disables its welds. `Massless`
+		so a seat bolted high on the deck cannot shift the centre of mass and make the hull list.
+	]]
+	local helmSocket = (hull:FindFirstChild("Sockets") :: Folder):FindFirstChild("helm") :: Attachment
+	local seat = Instance.new("Seat")
+	seat.Name = "Helm"
+	seat.Size = Vector3.new(2, 1, 2)
+	seat.CFrame = hull.CFrame * CFrame.new(helmSocket.Position + Vector3.new(0, 0.5, 0))
+	seat.Anchored = false
+	seat.CanCollide = false -- crew walk through it rather than tripping over it
+	seat.Massless = true
+	seat.Material = Enum.Material.Metal
+	seat.Color = Color3.fromRGB(46, 70, 88)
+	seat.Parent = model
+
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = hull
+	weld.Part1 = seat
+	weld.Parent = seat
+	state.seat = seat
+
+	--[[
+		Track the occupant, and accept input from nobody else.
+
+		Cheap server-side authority: the remote arrives from a client, so without this any player could steer
+		the vessel from anywhere on the map. Checking the seat rather than a flag means it cannot get out of
+		sync with who is actually sitting there.
+	]]
+	seat:GetPropertyChangedSignal("Occupant"):Connect(function()
+		local occupant = seat.Occupant
+		local player = occupant and Players:GetPlayerFromCharacter(occupant.Parent)
+		state.driver = player
+		if not player then
+			-- releasing the helm must not leave the throttle open
+			state.throttle, state.steer = 0, 0
+			print("[VESSEL] helm released")
+		else
+			print(("[VESSEL] %s took the helm"):format(player.Name))
+		end
+		workspace:SetAttribute("VesselDriver", player and player.Name or "")
+	end)
+
 	print(("[VESSEL] %s built. mass %.0f, %d float points, K %.0f, D %.0f, drag %.1f, equilibrium %.4f")
 		:format(spec.name, mass, points, state.stiffness, state.damping, state.drag,
 			VesselPhysics.equilibriumRatio(mass, spec.draft, points, gravity)))
@@ -199,9 +253,61 @@ local function enforceOwnership(hull: BasePart)
 	end
 end
 
-local function step(dt: number)
+--[[
+	🔴 NOTICE WHEN THE HULL IS GONE, AND BRING IT BACK.
+
+	An exploding assembly is REMOVED by the engine - `Parent` becomes nil with no `Destroying` event fired, so
+	nothing is notified and the boat simply is not there any more. That happened once (see the force clamp in
+	`VesselPhysics`), and the failure mode was silently having no vessel and no explanation.
+
+	The clamp should prevent it recurring. This exists because "should" is not "does": a session that loses
+	its boat with a clear warning is recoverable, and one that loses it in silence wastes an afternoon.
+
+	Deliberately rate-limited. If something is destroying the hull continuously, respawning it sixty times a
+	second would make the place unusable and bury the warning.
+]]
+local lastRebuildAt = 0
+local REBUILD_COOLDOWN = 5
+
+local function hullIsLost(): boolean
 	local hull = state.hull
 	if not hull or not hull.Parent then
+		return true
+	end
+	-- a non-finite position means the solver has already lost it, even if the instance still exists
+	local p = hull.Position
+	return p.Y ~= p.Y or p.X ~= p.X
+end
+
+local function recoverIfLost(): boolean
+	if not hullIsLost() then
+		return false
+	end
+	if os.clock() - lastRebuildAt < REBUILD_COOLDOWN then
+		return true -- lost, but too soon to try again
+	end
+	lastRebuildAt = os.clock()
+	warn("[VESSEL] hull was LOST (removed by the engine or non-finite) - rebuilding. "
+		.. "If this repeats, a force is diverging: see VesselPhysics.MAX_FORCE_WEIGHTS")
+	if state.model then
+		state.model:Destroy()
+	end
+	state.floats = {}
+	buildVessel()
+	for _, player in ipairs(Players:GetPlayers()) do
+		if state.hull then
+			player.ReplicationFocus = state.hull
+		end
+	end
+	return true
+end
+
+local function step(dt: number)
+	if recoverIfLost() then
+		return
+	end
+	local hull = state.hull
+	if not hull then
 		return
 	end
 	enforceOwnership(hull)
@@ -209,14 +315,24 @@ local function step(dt: number)
 	local now = workspace:GetServerTimeNow()
 
 	-- BUOYANCY: one force per point, each from its own submersion and its own vertical velocity.
+	local weight = hull:GetMass() * workspace.Gravity
+	local points = #state.floats
 	for _, entry in ipairs(state.floats) do
 		local worldPos = entry.attachment.WorldPosition
 		local surface = WaveField.HeightAt(worldPos.X, worldPos.Z, now)
 		local pointVelocity = hull:GetVelocityAtPosition(worldPos)
-		local f = VesselPhysics.floatForce({
+		--[[
+			CLAMPED, and this guard is load-bearing rather than defensive.
+
+			The vessel destroyed itself once: a zero-blend sea change moved the wave amplitude 30-fold in one
+			frame, the stiff spring spiked, the integration diverged and the engine removed the assembly. The
+			ceiling is 3x weight per point - far more than needed to right a swamped hull, and small enough
+			that no single frame can impart a velocity the next cannot absorb.
+		]]
+		local f = VesselPhysics.clampedFloatForce({
 			submersion = surface - worldPos.Y,
 			verticalVelocity = pointVelocity.Y,
-		}, state.stiffness, state.damping, state.maxDepth)
+		}, state.stiffness, state.damping, state.maxDepth, weight, points)
 		entry.force.Force = Vector3.new(0, f, 0)
 	end
 
@@ -259,7 +375,18 @@ end
 	Only two numbers cross the network, both clamped. There is nothing here worth exploiting - the server
 	decides what force those numbers become, and the fuel they cost.
 ]]
-input.OnServerEvent:Connect(function(_player, throttle, steer)
+input.OnServerEvent:Connect(function(player, throttle, steer)
+	--[[
+		🔴 ONLY THE DRIVER STEERS.
+
+		The remote arrives from a client, so without this check any player could steer the vessel from
+		anywhere on the map - or from the lobby. Comparing against the SEAT's occupant rather than a flag
+		means the authority cannot drift out of sync with who is actually sitting at the helm.
+	]]
+	if state.driver ~= player then
+		return
+	end
+	-- NaN would propagate straight into a force; `x == x` is false only for NaN
 	if typeof(throttle) == "number" and throttle == throttle then
 		state.throttle = math.clamp(throttle, -1, 1)
 	end
@@ -342,6 +469,7 @@ _G.TideVessel = {
 			("throttle %.2f  steer %.2f  fuel %.1f/%.0f  engine %s"):format(
 				state.throttle, state.steer, state.fuel, spec.fuelCapacity, tostring(state.engineOn)),
 			("owner %s (must be nil)"):format(tostring(hull:GetNetworkOwner())),
+			("driver %s"):format(state.driver and state.driver.Name or "nobody at the helm"),
 			("tilt %.1f deg from level"):format(math.deg(math.acos(math.clamp(hull.CFrame.UpVector.Y, -1, 1)))),
 		}
 		return table.concat(lines, "\n")

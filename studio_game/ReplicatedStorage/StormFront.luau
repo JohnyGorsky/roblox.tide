@@ -169,6 +169,26 @@ function StormFront.apply()
 	workspace:SetAttribute(ATTR_INTENSITY, band.intensity)
 	workspace:SetAttribute(ATTR_WIND, windFor(band.intensity, workspace:GetServerTimeNow()))
 
+	--[[
+		🔴 AN OVERRIDE THAT ACTUALLY STICKS.
+
+		This function runs every second from the world tick and rewrites `SeaState`, which silently clobbered
+		any manual override within about 0.65 seconds - measured, not guessed. So the admin panel's "Sea state"
+		tool has been broken since the tick arrived in job 017 for any state that did not happen to match the
+		current storm band, and `DeadCalm` was unreachable entirely, because NO band ever selects it.
+
+		That is the "forcing an end-state" trap: a system that rewrites a value every tick beats a manual
+		write, and the fix is to give it something to respect rather than to fight it.
+
+		With `SeaOverride` set, the storm keeps computing distance, intensity and wind - all of which stay
+		honest, so the front still closes and still threatens - and simply stops choosing the sea. Clearing
+		the attribute hands the choice straight back.
+	]]
+	local override = workspace:GetAttribute("SeaOverride")
+	if typeof(override) == "string" and SeaStates.get(override) then
+		return
+	end
+
 	-- Selecting the sea state is how the storm changes the look, indirectly (decision 0018).
 	local current = workspace:GetAttribute("SeaState")
 	if current ~= band.sea then

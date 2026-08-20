@@ -246,14 +246,34 @@ tools.seaState = {
 	label = "Sea state",
 	section = "Sea",
 	scope = "global",
-	controls = { kind = "choice", options = { "DeadCalm", "LightSwell", "Choppy", "Storm", "TheWall" } },
+	controls = {
+		kind = "choice",
+		options = { "auto (storm decides)", "DeadCalm", "LightSwell", "Choppy", "Storm", "TheWall" },
+	},
 	run = function(_player: Player, args: any)
 		local SeaStates = seaStates()
 		if not SeaStates then return false, "SeaStates not found" end
-		local state = SeaStates.get(args and args.value)
-		if not state then return false, ("unknown sea state %q"):format(tostring(args and args.value)) end
+		local value = tostring(args and args.value)
+		--[[
+			🔴 PIN THE OVERRIDE, or this tool does nothing.
+
+			`WorldTick` calls `StormFront.apply()` every second, which rewrites `SeaState` from the current
+			storm band - measured clobbering a manual write in 0.65s. So this tool had been silently broken
+			since job 017 for any state that did not match the band, and DeadCalm was unreachable entirely
+			because no band selects it. Setting `SeaOverride` makes the storm leave the sea alone.
+		]]
+		if value:find("auto") then
+			workspace:SetAttribute("SeaOverride", nil)
+			return true, "handed back to the storm - the current band decides the sea again"
+		end
+		local state = SeaStates.get(value)
+		if not state then return false, ("unknown sea state %q"):format(value) end
+		workspace:SetAttribute("SeaOverride", state.id)
 		-- 4s blend: fast enough to judge, slow enough that nothing floating is thrown
-		return true, "applied " .. applyFull(state, 4)
+		return true, table.concat({
+			"PINNED " .. applyFull(state, 4),
+			"The storm keeps closing, but no longer picks the sea. Choose 'auto' to release.",
+		}, "\n")
 	end,
 }
 
@@ -262,13 +282,22 @@ tools.seaStateInstant = {
 	label = "Sea state (snap, no blend)",
 	section = "Sea",
 	scope = "global",
-	controls = { kind = "choice", options = { "DeadCalm", "LightSwell", "Choppy", "Storm", "TheWall" } },
+	controls = {
+		kind = "choice",
+		options = { "auto (storm decides)", "DeadCalm", "LightSwell", "Choppy", "Storm", "TheWall" },
+	},
 	run = function(_player: Player, args: any)
 		local SeaStates = seaStates()
 		if not SeaStates then return false, "SeaStates not found" end
-		local state = SeaStates.get(args and args.value)
+		local value = tostring(args and args.value)
+		if value:find("auto") then
+			workspace:SetAttribute("SeaOverride", nil)
+			return true, "handed back to the storm"
+		end
+		local state = SeaStates.get(value)
 		if not state then return false, "unknown sea state" end
-		return true, "snapped to " .. applyFull(state, 0)
+		workspace:SetAttribute("SeaOverride", state.id) -- see the note on `seaState`
+		return true, "PINNED, snapped to " .. applyFull(state, 0)
 	end,
 }
 

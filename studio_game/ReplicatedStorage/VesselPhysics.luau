@@ -107,7 +107,45 @@ export type FloatSample = {
 	would produce four times the force needed to hold the boat up. Clamping at roughly twice the draft keeps
 	green water on deck survivable rather than comic.
 ]]
+--[[
+	🔴 HARD CEILING ON WHAT BUOYANCY MAY EVER APPLY, as a multiple of the hull's own weight.
+
+	This exists because the vessel DESTROYED ITSELF once, and the cause is worth recording in full.
+
+	A zero-blend sea change (the panel's "snap, no blend" tool) moved the wave amplitude from Dead Calm's 0.15
+	to Storm's 4.5 in a single frame. The hull found itself several studs underwater instantly, the stiff
+	spring produced an enormous impulse, the explicit integration diverged over a few frames, and the engine
+	removed the whole assembly - `Parent` became nil with no `Destroying` event, exactly the failure the
+	physics guidance describes for an exploding assembly.
+
+	The lesson is not "do not snap the sea". The sea is allowed to do whatever it likes; a spring-damper that
+	can be driven to destruction by its own input is simply not finished. So the force is clamped to something
+	physically sufficient and numerically safe:
+
+	  * 3x weight is far more than needed to right a swamped hull (it accelerates at 2g),
+	  * and it is small enough that no single frame can impart a velocity the next frame cannot absorb.
+]]
+VesselPhysics.MAX_FORCE_WEIGHTS = 3
+
+--[[
+	Ceiling on the velocity fed to the damping term.
+
+	Damping is `-velocity * D`, so a spike in velocity produces a proportional spike in force - which is the
+	mechanism by which a diverging oscillation feeds itself. Clamping the velocity breaks that loop while
+	leaving normal motion (a few studs per second) completely untouched.
+]]
+VesselPhysics.MAX_DAMPED_VELOCITY = 60
+
 function VesselPhysics.floatForce(sample: FloatSample, stiffness: number, damping: number, maxDepth: number): number
+	--[[
+		Reject non-finite input before it can propagate. A NaN submersion - from a wave field sampled at a
+		NaN position, say - would otherwise become a NaN force, and a NaN in the solver removes the assembly
+		rather than reporting anything.
+	]]
+	if sample.submersion ~= sample.submersion or sample.verticalVelocity ~= sample.verticalVelocity then
+		return 0
+	end
+
 	local depth = math.clamp(sample.submersion, 0, maxDepth)
 	local spring = depth * stiffness
 
@@ -123,10 +161,34 @@ function VesselPhysics.floatForce(sample: FloatSample, stiffness: number, dampin
 	]]
 	local damped = 0
 	if sample.submersion > -maxDepth then
-		damped = -sample.verticalVelocity * damping
+		-- velocity clamped, so a spike cannot produce a damping force that feeds the next spike
+		local v = math.clamp(sample.verticalVelocity, -VesselPhysics.MAX_DAMPED_VELOCITY, VesselPhysics.MAX_DAMPED_VELOCITY)
+		damped = -v * damping
 	end
 
 	return spring + damped
+end
+
+--[[
+	The same force, with the hard ceiling applied. THIS is what the server should call.
+
+	Kept as a separate function so `floatForce` stays a clean statement of the physics and the safety limit is
+	visible as a deliberate, separate act rather than buried in the maths.
+]]
+function VesselPhysics.clampedFloatForce(
+	sample: FloatSample,
+	stiffness: number,
+	damping: number,
+	maxDepth: number,
+	weight: number,
+	points: number
+): number
+	local raw = VesselPhysics.floatForce(sample, stiffness, damping, maxDepth)
+	local ceiling = (weight / math.max(points, 1)) * VesselPhysics.MAX_FORCE_WEIGHTS
+	if raw ~= raw then
+		return 0
+	end
+	return math.clamp(raw, -ceiling, ceiling)
 end
 
 --[[
