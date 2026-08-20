@@ -2,7 +2,7 @@
 
 **Project**: `roblox.tide`
 **Created**: 2026-08-20 21:58:19
-**Status**: Requirements Gathering (intake)
+**Status**: ✅ Completed — signed off as MVP
 
 ## Requirements / goal
 
@@ -10,7 +10,12 @@ Group 02's first job, and the first thing that makes this a game rather than a s
 
 ## Checklist
 
-- [ ] Requirements reviewed (this intake)
-- [ ] Implementation plan created & agreed
-- [ ] Implementation completed
-- [ ] Final summary + changelog written
+- [x] Requirements reviewed (this intake)
+- [x] Implementation plan created & agreed
+- [x] Implementation completed — **MVP signed off by the user 2026-08-21**
+- [x] Final summary + changelog written
+
+Delivered beyond the intake, all from the user driving it and reporting: the helm rebuilt as a station
+rather than a seat (a seat destroyed the boat), steering rebuilt as a rudder torque rather than a commanded
+yaw rate, lateral grip added (there was no sideways resistance at all), heel through a turn researched and
+modelled in both phases, and trim split into planing plus inertial so deceleration digs the bow in.

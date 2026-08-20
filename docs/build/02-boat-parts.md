@@ -12,6 +12,20 @@ decisions [0005](../decisions/0005-boat-mobile-base.md), [0009](../decisions/000
 
 ---
 
+> **First job delivered — [021](../../Jobs/021/final-summary.md), MVP signed off 2026-08-21.** The kit exists
+> (`Vessel` specs + 8 sockets), the starter launch floats on the wave field with four-point buoyancy, and she
+> steers, trims, heels, burns fuel and holds her course. Server-owned throughout, no `VehicleSeat`
+> ([decision 0022](../decisions/0022-vessel-physics-and-authority.md)).
+>
+> **Nothing in the kit is tuned per hull** — buoyancy stiffness, drag, rudder authority and yaw damping are all
+> derived from the spec's statements of intent (`draft`, `cruise`, `rudderLag`) plus the hull's own mass and
+> inertia. Verified exact across hulls from 4,200 to 90,000 mass. That property is the whole promise of
+> decision 0009 and must not be broken by a later vessel.
+>
+> ⚠️ Read [finding 0019](../../findings/0019-a-large-torque-applied-in-a-body-relativ.md) before touching any
+> force on a vessel: a large torque in a body-relative frame leaks into every axis the body rotates about, and
+> it spun this hull 178 degrees in 8 seconds with the wheel amidships.
+
 ## Build the module kit once, then the hulls
 
 The trap here is building a boat. Decision 0009 says build a **Vessel**: a hull plus sockets, and a

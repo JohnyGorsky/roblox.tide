@@ -57,6 +57,7 @@ dialog, or restart Studio. It blocks the last two admin checks:
 | Feature | Status | Notes |
 |---|---|---|
 | `GAME-0011` Sea & Sea States | `IN_PROGRESS` | Ocean + harbour built and verified. Five states in `SeaStates.luau`. Skies sourced; look approved |
+| `GAME-0001` Boat Controller | `IMPLEMENTED` | Job 021, **MVP signed off 2026-08-21**. Floats, steers, trims, heels, burns fuel. Server-owned, helm is a standing station not a seat. Not VERIFIED: never tested with two players, and mobile controls never run on a touch canvas |
 | `GAME-0003` Advancing Storm Front | `IMPLEMENTED` | Job 018. Front advances, everyday weather drifts, lightning lights the sea at range, cloud wall grows and engulfs, 4-channel audio bed. **Approved by eye for the POC.** Not VERIFIED because the storm still cannot hurt you |
 | `GAME-0004` Day/Night | `IN_PROGRESS` | 575 s cycle. `DayNight.compose()` is the sole writer of Lighting, Terrain water and the cloud layer |
 | `GAME-0012` Admin Panel | `IN_PROGRESS` | Both places. **F4** or **ADM** (bottom-right). **32 tools** in game across Sea / Weather / Storm / Audio / Diagnostics. Gate attack-tested and passed |
@@ -96,7 +97,15 @@ Nothing else in the place is script-generated; the ocean, harbour and spawn are 
 
 ## Recommended next move
 
-**[02](build/02-boat-parts.md) vessel foundation.** Groups 01 and 07 are now built as far as they can go
+**The storm's teeth** — [decision 0014](decisions/0014-storm-consequence.md) makes the front inflict hull
+damage and system faults, escapable in 30-60s, and nothing implements it. It was deferred precisely because it
+needs a hull to damage, and now there is one. It is also small, and it converts the storm from a spectacle
+into the threat the whole macro loop depends on.
+
+Then **[03](build/03-items-props.md) items** — fuel is the loop's real currency, and the boat currently starts
+with a full tank and no way to refill it.
+
+~~**[02](build/02-boat-parts.md) vessel foundation.**~~ *(delivered, job 021)* Groups 01 and 07 are now built as far as they can go
 without a deck to stand on, and the storm was signed off for the POC on 2026-08-20: the sea, its states, the
 wave field, the day/night cycle, everyday weather, lightning, the cloud wall and the audio bed all exist and
 all tick. The next thing that changes the game rather than the scene is the hull.

@@ -19,7 +19,7 @@
 
 | | Feature | Id | Status | Pri |
 |---|---|---|---|---|
-| `##...` | [Boat Controller](docs/features/0001-boat-controller/feature.md) | GAME-0001 | READY | P0 |
+| `####.` | [Boat Controller](docs/features/0001-boat-controller/feature.md) | GAME-0001 | IMPLEMENTED | P0 |
 | `#....` | [Vessel Class Foundation](docs/features/0008-vessel-class-foundation/feature.md) | GAME-0008 | PLANNED | P1 |
 
 ### atmosphere
@@ -77,9 +77,8 @@
 | Status | Features |
 |---|---|
 | PLANNED | 7 |
-| READY | 1 |
 | IN_PROGRESS | 5 |
-| IMPLEMENTED | 1 |
+| IMPLEMENTED | 2 |
 | **total** | **14** |
 
 ## The build manifest - what actually needs making
@@ -143,7 +142,7 @@ that exist in Studio but were never registered.
 - [x] **018** Finish the storm's presence: time scale, lightning, cloud wall, audio
 - [x] **019** Living-world audio: ambience mixer, ocean beds, storm bed
 - [x] **020** Admin panel: collapsible sections, client-side tools, time-of-day and audio solo
-- [ ] **021** Vessel foundation: chassis, socket kit, buoyancy, helm and fuel
+- [x] **021** Vessel foundation: chassis, socket kit, buoyancy, helm and fuel
 
 An unchecked job is still in flight.
 
