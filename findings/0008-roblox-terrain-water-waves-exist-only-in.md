@@ -1,7 +1,7 @@
 # FINDING 0008: Roblox terrain-water waves exist only in the shader - nothing can query them
 
 **Project:** `roblox.tide`
-**Status:** open
+**Status:** fixed (2026-08-20) — Not a defect to fix - engine behaviour, now captured as knowledge and propagated where it will be read. Roblox terrain-water waves exist only in the shader; a raycast returns a flat plane at WATER_Y with 0.000000 spread across position, time and even maximum WaterWaveSize. Recorded in feature 0014, in manifest group 01, and most importantly as a warning on group 02's buoyancy row, because the actionable consequence lands on the boat controller: terrain-water auto-buoyancy pulls toward that flat plane and will fight a wave-field-driven hull, with a symptom that looks like jitter rather than a design conflict. Hull parts must be non-buoyant to the engine, or its contribution accounted for explicitly.
 **Severity:** med
 **Created:** 2026-08-20 13:03:20
 

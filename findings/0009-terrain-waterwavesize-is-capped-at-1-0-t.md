@@ -1,7 +1,7 @@
 # FINDING 0009: Terrain.WaterWaveSize is capped at 1.0 - The Wall silently asked for 1.4
 
 **Project:** `roblox.tide`
-**Status:** open
+**Status:** fixed (2026-08-20) — Fixed in job 012. The Wall's waveSize changed from an unachievable 1.4 to 1.0 with the engine cap documented at the value, and the admin panel's wave-size slider now maxes at 1 instead of 2 so nobody can drag into a range that silently does nothing. The design consequence is recorded in the feature and the manifest: 1.0 is the roughest the RENDERED water can look, so The Wall's extra violence must come from the wave field, spray and camera shake rather than this dial.
 **Severity:** med
 **Created:** 2026-08-20 13:18:00
 

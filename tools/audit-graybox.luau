@@ -24,6 +24,11 @@ local REGISTERED: { [string]: { represents: string, place: string, path: string 
 		place = "lobby",
 		path = "Workspace.GB_SpawnDock",
 	},
+	["GB-GAME-DECK"] = {
+		represents = "ASSET-BOAT-STARTER",
+		place = "game",
+		path = "Workspace.GB_ObservationDeck",
+	},
 }
 
 local TAG = "Graybox"

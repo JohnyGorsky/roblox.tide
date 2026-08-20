@@ -113,3 +113,17 @@ assets:
   notes: Sheltered harbour, 4096 x 4096 studs. Sand -48..-40, water -40..0. Shallower, greener and
     calmer than the open sea (WaveSize 0.06, Transparency 0.42) so the lobby reads as a safe bay.
     Verified by voxel read-back.
+- id: GB-GAME-DECK
+  type: graybox
+  status: GRAYBOX
+  source: studio
+  represents: ASSET-BOAT-STARTER
+  place: game
+  roblox_path: Workspace.GB_ObservationDeck
+  feature: GAME-0014
+  notes: 48 x 2 x 32 DiamondPlate deck at Y=3 with four low rails, Wet Steel. Exists because the game
+    place runs CharacterAutoLoads=false by design, so a developer pressing Play gets no body and there is
+    nothing to stand on. Paired with the admin panel's 'Spawn me a character' tool. Represents the starter
+    vessel because standing on the launch's DECK is what replaces this - so the graybox audit will keep
+    reporting it until GAME-0001 lands, which is intended. Delete it then; do not build anything that
+    depends on its position.

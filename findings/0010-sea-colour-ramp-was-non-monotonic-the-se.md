@@ -1,7 +1,7 @@
 # FINDING 0010: Sea colour ramp was non-monotonic - the sea brightened as it worsened
 
 **Project:** `roblox.tide`
-**Status:** open
+**Status:** fixed (2026-08-20) — Fixed in job 012. Choppy moved off Storm Teal (luminance 0.309, the lightest of the ocean colours and actually a shallow-water colour) onto an intermediate blue 15,42,58, and The Wall onto 8,20,30. The ramp now falls monotonically: 0.185, 0.185, 0.147, 0.106, 0.071 - verified by computing luminance per state. visual-design.md now lists the ocean colours darkest-first with measured luminances and an explicit warning that a colour's NAME is not a guide to where it belongs on a brightness ramp, which is what allowed the mistake.
 **Severity:** med
 **Created:** 2026-08-20 13:18:00
 

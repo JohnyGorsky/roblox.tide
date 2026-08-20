@@ -105,7 +105,7 @@ Groups are sized to be taken one at a time. See [docs/build/README.md](docs/buil
 
 | Status | Count |
 |---|---|
-| GRAYBOX | 1 |
+| GRAYBOX | 2 |
 | IDEA | 8 |
 | IMPLEMENTED | 2 |
 
@@ -114,6 +114,7 @@ Groups are sized to be taken one at a time. See [docs/build/README.md](docs/buil
 | Placeholder | Stands in for | Place | Note |
 |---|---|---|---|
 | `GB-LOBBY-DOCK` | ASSET-LOBBY-HARBOUR-DOCK | lobby | 64 x 4 x 40 WoodPlanks slab at Y=2, Weathered Wood colour. Exists because the lobby has |
+| `GB-GAME-DECK` | ASSET-BOAT-STARTER | game | 48 x 2 x 32 DiamondPlate deck at Y=3 with four low rails, Wet Steel. Exists because the game |
 
 Verify against the live places with `tools/audit-graybox.luau` - it catches placeholders
 that exist in Studio but were never registered.
@@ -133,6 +134,7 @@ that exist in Studio but were never registered.
 - [x] **011** Record decisions 0014-0017: storm consequence, shared rig, island storage, deck navigation
 - [x] **012** Wave field: HeightAt / NormalAt for the sea surface
 - [x] **013** Admin panel: atmosphere and palette colour controls
+- [x] **014** Make the game place enterable for a dev: spawn-on-demand and an observation deck
 
 An unchecked job is still in flight.
 

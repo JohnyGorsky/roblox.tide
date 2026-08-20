@@ -29,15 +29,15 @@ the storm carries no threat.
 - [x] No land surface between the water level and `WATER_Y + 8` (shelf artifact)
 - [x] `SeaStates` data module defining the five states, one table driving water + fog + ambient together
 - [x] A way to apply a state live for judging
-- [ ] The user picks which states read correctly and which need tuning
+- [x] The user picks which states read correctly and which need tuning — reviewed in Play 2026-08-20, approved
 - [x] Ocean sized so fog closes before the water ends (6144 studs; `OCEAN_HALF_EXTENT` + validator)
 - [ ] **BLOCKED: overcast sky assets.** Proven in job 007 that neither Fog nor Atmosphere can make
       Roblox's clear-day sky overcast, so the cold palette cannot be reached without them
       (`ASSET-SKY-OVERCAST`, finding 0006)
 - [ ] Horizon treatment beyond fog (cloud bank, silhouettes) — needs art, deferred
-- [ ] **`atmosphere` block per state** — Density, Haze, Glare, Color, Decay. Currently `SeaStates` drives
-      only fog, but job 007 proved Atmosphere and the sky dominate the sea's apparent colour, so without
-      this the states cannot actually change how the water reads
+- [x] **`atmosphere` block per state** — Density, Offset, Haze, Glare, Color, Decay; applied by `apply()`
+      and interpolated by `lerp()`. Job 014. Haze capped at 2.0 everywhere, the measured ceiling above
+      which wave detail flattens
 - [ ] Transient weather response beyond the five states: a rain squall or lightning flash briefly altering
       the water read, rather than colour only ever stepping between states
 - [ ] Wave-height sampler so physics can agree with the visuals — GAME-0014
