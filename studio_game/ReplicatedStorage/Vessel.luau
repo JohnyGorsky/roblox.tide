@@ -193,12 +193,22 @@ local STARTER_LAUNCH: Spec = {
 		  heelOutDeg  she settles OUTWARD once the rate of turn is established and centrifugal force at the
 		              centre of gravity - above the centre of lateral resistance - takes over.
 
-		4 in, 2.5 out: the flick reads clearly, the settle is a lean you can see on the horizon rather than
-		something that throws the crew about. Both are converted to moments against the measured roll
-		stiffness of 120,844 N-stud per degree.
+		🔴 heelOutDeg MUST EXCEED heelInDeg, and getting this wrong is subtle.
+
+		The rudder does not stop pushing once the turn is established - it stays deflected, so its inward
+		moment PERSISTS. For the heel to cross over to outward, the centrifugal term has to overcome it, not
+		merely match it. With 4 in and 2.5 out she flicked inward and then settled at 1.6 degrees still
+		inward, never crossing over - measured, and wrong against the research.
+
+		4 in and 5.5 out gives what a real hull does:
+		    peak    ~4 degrees INTO the turn while the yaw rate is still building
+		    steady  ~1.5 degrees OUT of it once centrifugal force has taken over
+
+		Both are converted to moments against the hull's measured roll stiffness of 120,844 N-stud per degree,
+		so these numbers mean actual degrees.
 	]]
 	heelInDeg = 4.0,
-	heelOutDeg = 2.5,
+	heelOutDeg = 5.5,
 	--[[
 		Righting torque - a BACKSTOP, not the righting mechanism. Cut from 900,000 after measuring.
 
