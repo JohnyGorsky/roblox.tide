@@ -662,9 +662,26 @@ local function step(dt: number)
 			constraint. Forward is -Z, so rolling to starboard is a positive moment about the flattened
 			forward axis.
 		]]
+		--[[
+			🔴 SIGN. This was negated, and it had the heel exactly backwards.
+
+			Convention, written out because getting it wrong twice is easy:
+			  forward is `LookVector`, which is the hull's -Z
+			  a POSITIVE torque about the forward axis, by the right-hand rule, sends starboard (+X) DOWN
+			  starboard down = leaning to starboard = INTO a starboard turn
+
+			For a turn to starboard the rudder term makes `moment` positive, so applying `flat.Unit * moment`
+			puts starboard down - into the turn - which is the transient the research describes. Once the turn
+			settles the centrifugal term (larger) drives `moment` negative and she leans out. Both phases, in
+			the right order.
+
+			With the negation it did the opposite: leaned OUT as the wheel went over and INTO the turn once
+			settled. The user spotted it from the deck before my own test did - because my test labelled
+			positive `asin(RightVector.Y)` as "in", when starboard-up is in fact leaning to PORT.
+		]]
 		local flat = Vector3.new(forward.X, 0, forward.Z)
 		if flat.Magnitude > 0.01 then
-			state.heel.Torque = flat.Unit * -moment
+			state.heel.Torque = flat.Unit * moment
 		else
 			state.heel.Torque = Vector3.zero
 		end

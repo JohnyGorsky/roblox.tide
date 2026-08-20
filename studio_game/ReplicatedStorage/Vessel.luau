@@ -207,8 +207,16 @@ local STARTER_LAUNCH: Spec = {
 		Both are converted to moments against the hull's measured roll stiffness of 120,844 N-stud per degree,
 		so these numbers mean actual degrees.
 	]]
-	heelInDeg = 4.0,
-	heelOutDeg = 5.5,
+	--[[
+		Raised from 4/5.5 after driving it: the measured heel in calm water was only about 1.6 degrees, which
+		is not a lean you notice from the deck. A small fast launch in a hard turn heels visibly - 8 to 12
+		degrees is believable and is what reads as a boat carving a turn rather than sliding round it.
+
+		9 in / 12 out keeps the crossover (out must exceed in, or she never settles outward) and lands at
+		roughly a 9-degree flick into the turn settling to ~3 degrees out of it.
+	]]
+	heelInDeg = 9.0,
+	heelOutDeg = 12.0,
 	--[[
 		Righting torque - a BACKSTOP, not the righting mechanism. Cut from 900,000 after measuring.
 
