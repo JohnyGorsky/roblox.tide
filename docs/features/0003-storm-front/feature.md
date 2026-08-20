@@ -16,7 +16,8 @@ Implement the smallest production-worthy version of this system while preserving
 ## Requirements
 
 - [x] Logical storm position — `StormFront`, five uneven bands, job 017
-- [x] Visible storm wall — `CloudWallVFX` astern + the built-in `Clouds` layer, job 018
+- [x] Visible storm wall — `CloudWallVFX` astern + the built-in `Clouds` layer, job 018. **Approved by eye
+      2026-08-20** after four attempts; see the job summary for why the first three failed
 - [x] Rain/wind/lightning layers — `StormVFX`, `Lightning`/`LightningVFX`, `StormAudio` (wind live; rain
       and thunder clips still unsourced), job 018
 - [ ] Danger when caught — no damage model yet; The Wall currently only *looks* unsurvivable
@@ -53,5 +54,4 @@ Two safety properties, both verified numerically in job 018 and both worth re-ch
   escapable-in-30–60s; nothing implements it.
 - **Rain and thunder audio.** Slots are addressable and empty on purpose — spec in
   `roblox.workspace/Assets/registry/audio.md`.
-- **Does the particle wall read as cloud, or as smoke?** If smoke, escalate to a textured arc.
 - Screen-level rain streaks.

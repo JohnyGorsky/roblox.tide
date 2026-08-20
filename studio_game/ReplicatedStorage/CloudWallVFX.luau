@@ -8,49 +8,55 @@
 	THIS IS THE STORM'S DIAGNOSTIC, NOT DECORATION
 
 	Decision 0020 makes rain, chop, wind and closing fog ORDINARY - they happen on afternoons that mean
-	nothing. That was right for making the world feel natural, and it left the storm needing one signal that
-	weather can never counterfeit. This is it: a dark mass astern that only ever grows.
+	nothing. That left the storm needing one signal weather can never counterfeit. This is it: a dark mass
+	astern that only ever grows.
 
-	So the rule that matters most is about the INPUT, not the look:
+	The rule that matters most is about the INPUT, not the look:
 
 	    🔴 driven by StormIntensity / StormDistance - NEVER by Wind or Precipitation.
 
-	Wind and precipitation are shared with everyday weather. Drive the wall off either and a breezy afternoon
-	grows a wall, destroying the one unambiguous cue the crew has.
+	Drive it off either of those and a breezy afternoon grows a wall, destroying the one unambiguous cue the
+	crew has.
 
 	--------------------------------------------------------------------------------------------------
-	🔴 GEOMETRY FIRST, PARTICLES SECOND. THIS WAS REWRITTEN FOR A REASON.
+	🔴 FOUR ATTEMPTS. THE HISTORY IS THE DOCUMENTATION.
 
-	The first version was particles alone, and the user could not see it at all. Two causes, and the second
-	is the lesson:
+	  1. Particles parented to the CAMERA at ~1000 studs, placed at 82% of FogEnd. Invisible twice over:
+	     camera-parenting is a viewmodel technique meant for things a few studs from the lens (finding 0016),
+	     and 82% of FogEnd is ~81% occluded so the fog erased it anyway (finding 0014).
 
-	  1. It was placed at 82% of `FogEnd`, which is ~81% OCCLUDED, so the fog in front erased it
-	     (finding 0014). Fixed by placing at a target occlusion instead.
+	  2. Anchored slab geometry in an arc. This DID render - and read as flat grey cards with hard vertical
+	     lines between them. The segments overlapped, and two surfaces at 39% transparency composite into a
+	     visibly DARKER strip, so the gap-hiding factor became the artefact; and on an arc, adjacent slabs
+	     face 22° apart, catch the directional light differently, and every boundary becomes a crease.
+	     Lesson: a flat transparent surface ALWAYS reads as a card. Not tunable.
 
-	  2. The emitter part was parented to `workspace.CurrentCamera` at ~1000 studs. Camera-parenting is a
-	     VIEWMODEL technique - it is for things a few studs from the lens, like the rain rig. Using it for a
-	     distant world-scale object put the wall's rendering into a path it was never meant for.
+	  3. Particles only, in Workspace, at their true ~1000 studs. Nothing visible at all - while the slabs
+	     from attempt 2 had rendered fine at that exact distance. So the failure is specific to particles at
+	     range, with two plausible causes I could not distinguish without eyes on the scene: Roblox culling
+	     distant emitters, or a cap on rendered particle size well below the ~1000 studs the property accepts.
 
-	The deeper mistake was betting the whole feature on one uncertain mechanism. A silhouette this important
-	should not depend on particle rendering behaving a particular way at a kilometre. So now:
-
-	    SLABS      real anchored geometry in Workspace, arranged as an arc. GUARANTEED to render.
-	    PARTICLES  churn along the top edge only, so the silhouette is ragged instead of a clean rectangle.
-
-	If the particles fail for any reason the wall is still there. That is the property that was missing.
-
-	These are created on the CLIENT and live in Workspace, so they are never replicated to the server and
-	never touch anyone else's session.
+	  4. This one. DRAWN NEAR, MADE TO LOOK FAR - which defeats both candidate causes at once instead of
+	     gambling on picking the right one.
 
 	--------------------------------------------------------------------------------------------------
-	FOG IS THE CONSTRAINT THAT SHAPES ALL OF THIS
+	HOW "DRAWN NEAR, LOOKS FAR" WORKS
 
-	At intensity 2 the composed fog ends near 2280 while the front may still be 2500 away, so a wall drawn at
-	its true distance would be invisible and the crew's warning would arrive far too late.
+	The bank sits at a fixed 340 studs with modest particle sizes, so nothing can cull it and no plausible
+	size cap applies. Apparent distance is then produced the way it actually reaches the eye:
 
-	It is therefore drawn at a fixed target OCCLUSION and made to GROW. What the player reads is "the horizon
-	astern is darkening and rising", which is honest - that is exactly what an approaching front looks like
-	from a small boat - while staying visible at every stage.
+	    ANGULAR SIZE   width and height are authored as ANGLES and converted at the render distance, so the
+	                   bank subtends exactly what it would have if drawn a kilometre away
+	    HAZE           colour is blended toward the fog colour, and opacity reduced, by the occlusion the
+	                   TRUE distance would have produced - since real fog cannot do that from 340 studs
+
+	This is the trick every skybox uses, and it has a real bonus: fog can no longer erase the wall, because
+	haze is now applied deliberately rather than suffered.
+
+	What it gives up is parallax - the bank does not shift as the player moves. At a simulated kilometre that
+	is imperceptible, and it is the same compromise a skybox makes.
+
+	Everything lives in a Workspace folder. Client-created, so never replicated.
 ]]
 
 local RunService = game:GetService("RunService")
@@ -59,39 +65,107 @@ local Lighting = game:GetService("Lighting")
 local CloudWallVFX = {}
 
 --- Bearing the front lies on. Matches Lightning.ASTERN_BEARING: progress runs +Z, the storm chases from -Z.
-local ASTERN_BEARING = 180
+local ASTERN = Vector3.new(0, 0, -1)
 
 --[[
-	How wide an arc the wall covers, in degrees.
+	Near enough that no culling or size cap can apply. Everything below is authored against this.
 
-	Deliberately very wide. `Part.Size` silently CLAMPS AT 2048 studs (measured - asking for 3000 returned
-	2048), so one slab cannot span the horizon; and a narrow wall means a player who turns slightly the wrong
-	way sees an empty sky and concludes there is nothing there. Which is exactly what happened.
+	🔴 IT CANNOT BE A CONSTANT, and that bug is worth recording: the wall VANISHED at the last phase.
 
-	200° means it is behind you and well round both sides, so any glance backwards finds it.
+	Inside The Wall the composed fog closes to `FogEnd = 330`, so a bank pinned at 340 studs was being drawn
+	BEYOND the fog and erased completely - at exactly the moment it should be swallowing the crew. The same
+	class of mistake as finding 0014, just from the other side: there, the wall was too far into the fog;
+	here, the fog came in past the wall.
+
+	So the render distance follows the fog, and because every dimension below is authored as an ANGLE, the
+	bank's apparent size is unaffected by it moving. That is the property that makes this safe to change.
 ]]
-local ARC_DEGREES = 200
-local SEGMENTS = 9
+local RENDER_DISTANCE_MAX = 340
+
+local function renderDistance(): number
+	-- always comfortably inside the fog, however tight the fog gets
+	return math.clamp(math.min(RENDER_DISTANCE_MAX, Lighting.FogEnd * 0.5), 45, RENDER_DISTANCE_MAX)
+end
 
 --[[
-	Presence floor, and the curve from intensity to presence.
+	The bank's apparent size, in DEGREES rather than studs.
 
-	The wall must be clearly visible at PHASE 1, not merely present - it is the crew's early tell, and the
-	first version showed almost nothing until the front was already close. The power curve front-loads it:
-	intensity 1 lands at ~0.55 rather than the 0.34 a linear ramp gave.
+	Authoring angles is what makes the near-field trick honest: these are what the player actually perceives,
+	and they stay correct no matter what `RENDER_DISTANCE` is set to.
+
+	140° wide is deliberate. A narrow wall is indistinguishable from a missing one to anyone without a
+	compass, and that ambiguity alone cost a full round of debugging.
+]]
+--[[
+	The arc WIDENS as the front closes, from a band astern to something wrapped most of the way round.
+
+	Emitters are placed on an arc of bearings rather than along a straight line, which is only safe because
+	particles are camera-facing billboards - there are no facets to catch the light differently, so the
+	crease problem that killed the slab version cannot happen here. It also means the arc can exceed 180°,
+	which a straight line could never do.
+]]
+local ARC_MIN_DEG = 140
+local ARC_MAX_DEG = 230 -- wrapped past the sides; inside the front there is no clear horizon left
+
+--[[
+	Elevation, and this is the "come more and more" ramp.
+
+	14° is a smudge on the horizon. 76° is very nearly overhead - at the last phase the front should be
+	ENGULFING rather than standing off as a tall band, because that is the moment the crew is inside it.
+	It was 42°, which topped out looking like a distant wall no matter how close the storm actually got.
+]]
+local ELEVATION_MIN_DEG = 14
+local ELEVATION_MAX_DEG = 76
+
+--[[
+	Several emitters across the width rather than one.
+
+	One emitter is a single clump with a recognisable centre. Spaced emitters read as a continuous bank, and
+	being independently seeded they never form a pattern. Odd count so one sits dead astern.
+]]
+local EMITTER_COUNT = 9
+
+--[[
+	Particle size, in studs at the render distance.
+
+	Kept modest on purpose - this is the number attempt 3 got wrong, asking for 560-1000. Small enough that
+	no plausible engine cap bites, and density comes from having several rather than from each being vast.
+]]
+local PARTICLE_MIN = 70
+local PARTICLE_MAX = 190
+
+--[[
+	Presence: clearly visible at PHASE 1, on the user's instruction.
+	The power curve front-loads it - intensity 1 lands at ~0.56 where a linear ramp gave 0.34.
 ]]
 local PRESENCE_FLOOR = 0.18
 local PRESENCE_CURVE = 0.55
 
---- Target fraction of the fog between camera and wall. Above ~0.6 the fog erases it (finding 0014).
-local TARGET_OCCLUSION = 0.35
+--[[
+	The particle texture.
 
-local PALE = Color3.fromRGB(126, 133, 142)
-local NEAR_BLACK = Color3.fromRGB(17, 19, 23)
+	`smoke_main` is a soft radial alpha blob, which is the whole reason this can work where geometry could
+	not: every particle fades to nothing at its own edge, so the mass has no silhouette line anywhere, and
+	overlapping particles build density instead of banding.
+]]
+local CLOUD_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
+
+--[[
+	The two ends of the bank's colour ramp.
+
+	Both were far too light: the pale end at 158,166,176 was practically white, and once the haze blend had
+	lifted it further the wall read as a light grey mist rather than as weather. Even the "far" end of a
+	storm front is dark - that is what makes it a front and not a cloud.
+
+	`STORM_GREY` is the calm-day end, and it is still a dark slate. `BLACK` is genuinely near-black, because
+	The Wall is supposed to look like the world has stopped existing.
+]]
+local STORM_GREY = Color3.fromRGB(78, 84, 92)
+local BLACK = Color3.fromRGB(6, 7, 9)
 
 local root: Folder? = nil
-local slabs: { BasePart } = {}
 local emitters: { ParticleEmitter } = {}
+local parts: { BasePart } = {}
 local connection: RBXScriptConnection? = nil
 
 local smoothPresence = 0
@@ -102,21 +176,23 @@ local function attr(name: string, fallback: number): number
 	return if typeof(v) == "number" then v else fallback
 end
 
---- 0..1. From INTENSITY, so it steps with the same bands as the sea state and the lighting.
 local function presence(): number
 	local intensity = math.clamp(attr("StormIntensity", 0), 0, 4)
 	return PRESENCE_FLOOR + (1 - PRESENCE_FLOOR) * ((intensity / 4) ^ PRESENCE_CURVE)
 end
 
---- Where the wall sits, and how much air is in front of it. Shared by `step` and `report`.
-local function placement(): (number, number)
+--[[
+	The distance the bank is PRETENDING to be at, and how hazy that implies it should look.
+
+	Not where it is drawn. Used only to derive the haze, so a front still 3 km out looks washed out and a
+	front on top of you looks hard-edged.
+]]
+local function simulated(): (number, number)
 	local fogStart, fogEnd = Lighting.FogStart, Lighting.FogEnd
 	local span = math.max(1, fogEnd - fogStart)
-	local wanted = fogStart + span * TARGET_OCCLUSION
-	-- never draw it FURTHER than the front actually is; a wall ahead of the storm would be a lie
-	local distance = math.max(120, math.min(attr("StormDistance", 4200), wanted))
-	local occlusion = math.clamp((distance - fogStart) / span, 0, 1)
-	return distance, occlusion
+	local distance = math.max(200, math.min(attr("StormDistance", 4200), fogStart + span * 0.55))
+	local haze = math.clamp((distance - fogStart) / span, 0, 0.85)
+	return distance, haze
 end
 
 function CloudWallVFX.start()
@@ -127,58 +203,57 @@ function CloudWallVFX.start()
 	f.Parent = workspace -- WORLD, not the camera. See the header.
 	root = f
 
-	for i = 1, SEGMENTS do
-		local slab = Instance.new("Part")
-		slab.Name = "Slab" .. i
-		slab.Anchored = true
-		slab.CanCollide = false
-		slab.CanQuery = false -- must never be hit by a raycast; the wave field and buoyancy both raycast
-		slab.CanTouch = false
-		slab.CastShadow = false
-		slab.Material = Enum.Material.SmoothPlastic -- flat and unlit-looking; cloud has no specular
-		slab.Color = PALE
-		slab.Transparency = 1
-		slab.Size = Vector3.new(400, 300, 24)
-		slab.Parent = f
-		table.insert(slabs, slab)
+	for i = 1, EMITTER_COUNT do
+		local p = Instance.new("Part")
+		p.Name = "Bank" .. i
+		p.Anchored = true
+		p.CanCollide = false
+		p.CanQuery = false -- must never be raycast; the wave field and buoyancy both raycast
+		p.CanTouch = false
+		p.CastShadow = false
+		p.Transparency = 1 -- the PART is never visible. Only its particles are. No card, ever.
+		p.Size = Vector3.new(120, 120, 60)
+		p.Parent = f
+		table.insert(parts, p)
 
+		local e = Instance.new("ParticleEmitter")
+		e.Name = "Cloud"
+		e.Texture = CLOUD_TEXTURE
+		e.Rate = 0
 		--[[
-			Churn on the TOP EDGE only.
-
-			A slab alone reads as a wall of card, and the giveaway is its perfectly straight top. Particles
-			are spent entirely on breaking that line - which is cheap, because only the silhouette needs
-			them, and it means the body of the wall never depends on particle rendering.
+			Long lifetimes, low rate: the bank ACCUMULATES into a standing mass rather than streaming past.
+			Anything fast enough to see moving reads as smoke from a fire, not as weather.
 		]]
-		if i % 2 == 1 then
-			local e = Instance.new("ParticleEmitter")
-			e.Name = "Churn"
-			e.Texture = "rbxasset://textures/particles/smoke_main.dds"
-			e.Rate = 0
-			e.Lifetime = NumberRange.new(9, 15)
-			e.Speed = NumberRange.new(1, 4)
-			e.SpreadAngle = Vector2.new(30, 12)
-			e.Rotation = NumberRange.new(0, 360)
-			e.RotSpeed = NumberRange.new(-3, 3)
-			e.LightEmission = 0
-			e.LightInfluence = 1
-			e.Size = NumberSequence.new(160, 320)
-			e.Shape = Enum.ParticleEmitterShape.Box
-			e.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
-			e.EmissionDirection = Enum.NormalId.Top
-			e.Transparency = NumberSequence.new({
-				NumberSequenceKeypoint.new(0, 1),
-				NumberSequenceKeypoint.new(0.3, 0.55),
-				NumberSequenceKeypoint.new(0.7, 0.55),
-				NumberSequenceKeypoint.new(1, 1),
-			})
-			e.Parent = slab
-			table.insert(emitters, e)
-		end
+		e.Lifetime = NumberRange.new(12, 20)
+		e.Speed = NumberRange.new(0.2, 1.2)
+		e.SpreadAngle = Vector2.new(40, 25)
+		e.Rotation = NumberRange.new(0, 360)
+		e.RotSpeed = NumberRange.new(-2, 2) -- slow churn
+		e.LightEmission = 0
+		--[[
+			Mostly unlit.
+
+			At 1 the bank went almost black under a storm sky and vanished against it; at 0 it ignores the
+			scene entirely and floats free of the lighting. It sat at 0.5, which in bright daylight meant the
+			sun was washing the wall out - a third source of the "too light" problem, alongside the pale
+			palette and the haze blend.
+
+			0.25 keeps a little response to the weather while letting the authored dark colour dominate. The
+			front should look dark AT NOON; that is the whole point of it.
+		]]
+		e.LightInfluence = 0.25
+		e.Size = NumberSequence.new(PARTICLE_MIN, PARTICLE_MAX)
+		e.Shape = Enum.ParticleEmitterShape.Box
+		e.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+		e.Transparency = NumberSequence.new(0.5)
+		e.Parent = p
+		table.insert(emitters, e)
 	end
 
 	connection = RunService.RenderStepped:Connect(function(dt)
 		CloudWallVFX.step(dt)
 	end)
+	CloudWallVFX.prime()
 	return true
 end
 
@@ -187,14 +262,18 @@ function CloudWallVFX.stop()
 		connection:Disconnect()
 		connection = nil
 	end
-	-- named exactly, and only under Workspace, so this can never reach a ReplicatedStorage module
+	--[[
+		Scoped to Workspace and matched exactly. A previous cleanup matched names across containers and
+		destroyed ReplicatedStorage.StormVFX - and because Studio Sync is two-way, the source FILE with it
+		(finding 0015). Never widen this.
+	]]
 	local existing = workspace:FindFirstChild("CloudWall")
 	if existing and existing:IsA("Folder") then
 		existing:Destroy()
 	end
 	root = nil
-	table.clear(slabs)
 	table.clear(emitters)
+	table.clear(parts)
 	smoothPresence = 0
 end
 
@@ -204,88 +283,148 @@ function CloudWallVFX.step(dt: number)
 	local p = smoothPresence
 
 	local camera = workspace.CurrentCamera
-	if not camera or not root or not root.Parent or #slabs == 0 then
+	if not camera or not root or not root.Parent or #emitters == 0 then
 		return
 	end
 
-	local distance = placement()
+	local _, haze = simulated()
+	local distance = renderDistance()
+
+	-- Angles converted to studs AT THE RENDER DISTANCE, so apparent size is what was authored.
+	local arc = ARC_MIN_DEG + (ARC_MAX_DEG - ARC_MIN_DEG) * p
+	local elevation = ELEVATION_MIN_DEG + (ELEVATION_MAX_DEG - ELEVATION_MIN_DEG) * p
+	local height = distance * math.tan(math.rad(elevation))
+
+	--[[
+		Particle sizes scale with the render distance, so they keep a constant APPARENT size as the bank
+		moves in to stay inside the fog. Without this, the tightening fog would silently make every particle
+		look bigger, and the bank would bloat into a few enormous blobs at the last phase.
+	]]
+	local sizeScale = distance / RENDER_DISTANCE_MAX
+
 	local camPos = camera.CFrame.Position
-	local centre = Vector3.new(camPos.X, 0, camPos.Z)
+	local ground = Vector3.new(camPos.X, 0, camPos.Z)
 
 	--[[
-		Height rises as it closes, so the wall GROWS in the frame rather than only darkening. Angular size is
-		what a person reads as "approaching" - a mass that darkens without growing reads as nightfall.
+		HAZE, applied by hand.
+
+		Real fog cannot do this from 340 studs, so the bank is blended toward the fog colour and thinned by
+		the occlusion its pretend distance implies. This is what stops a near-drawn bank looking like a
+		near object - and it is why fog can no longer erase it.
 	]]
-	local height = 340 + 1150 * p
 	--[[
-		Slab width from the arc length, so the segments meet edge to edge at any distance. The 1.25 overlap
-		factor hides the seams: nine flat slabs on a curve leave visible gaps at the joins otherwise, and a
-		gap in a cloud bank looks like a hole in the sky.
+		HAZE LIGHTENS, SO IT IS KEPT ON A SHORT LEASH.
+
+		This factor was 0.75, and it was the main reason the wall read as a pale mist: at 55% haze it dragged
+		the colour 41% of the way toward the fog colour, which in fair weather is a LIGHT grey. So the more
+		distant the front, the whiter it went - the opposite of what a front should look like.
+
+		0.28 keeps just enough atmospheric lift to sell the distance without bleaching it.
 	]]
-	local arcLength = 2 * math.pi * distance * (ARC_DEGREES / 360)
-	local width = math.min(2048, (arcLength / SEGMENTS) * 1.25)
+	local shade = STORM_GREY:Lerp(BLACK, p):Lerp(Lighting.FogColor, haze * 0.28)
+	--[[
+		Opacity per particle.
 
-	local shade = PALE:Lerp(NEAR_BLACK, p)
-	-- more opaque as it closes; never fully solid, so fog and sky still read through it
-	local transparency = 0.62 - 0.42 * p
+		Was (0.46 - 0.20p) + haze*0.28, which came out around 0.51 at phase 1 - half transparent, on top of
+		a colour that was already too light. Roughly doubled now.
 
-	for i, slab in ipairs(slabs) do
-		local offset = ((i - 0.5) / SEGMENTS - 0.5) * ARC_DEGREES
-		local bearing = math.rad(ASTERN_BEARING + offset)
+		It is still not opaque, and that is deliberate: density has to come from MANY overlapping soft
+		sprites, because that is what produces a cloud edge. Push individual particles to solid and each one
+		becomes legible AS a blob, which is the particle equivalent of the flat-card problem from attempt 2.
+	]]
+	local alpha = (0.24 - 0.13 * p) + haze * 0.12
+
+	--[[
+		Chord between neighbouring emitters, so each part is wide enough to meet the next with no gap. Uses
+		`sin` of the half-step rather than a flat division, because on a wide arc the straight-line distance
+		between two bearings is noticeably less than the arc length between them.
+	]]
+	local stepDeg = arc / EMITTER_COUNT
+	local chord = 2 * distance * math.sin(math.rad(stepDeg / 2))
+
+	for i, part in ipairs(parts) do
+		local bearing = math.rad(180 + ((i - 0.5) / EMITTER_COUNT - 0.5) * arc)
 		local dir = Vector3.new(math.sin(bearing), 0, math.cos(bearing))
-		local position = centre + dir * distance + Vector3.new(0, height * 0.38, 0)
+		-- a little depth variation, so the bank has thickness rather than reading as one flat layer
+		local depth = 1 + ((i % 3) - 1) * 0.10
+		part.Size = Vector3.new(chord * 1.35, height, 70 * sizeScale)
+		part.Position = ground + dir * (distance * depth) + Vector3.new(0, height * 0.32, 0)
+		-- face the crew, so the emission box is seen broadside rather than edge-on
+		part.CFrame = CFrame.lookAt(part.Position, Vector3.new(ground.X, part.Position.Y, ground.Z))
 
-		slab.Size = Vector3.new(width, height, 24)
-		-- face the camera's ground position, so every segment is seen flat-on rather than edge-on
-		slab.CFrame = CFrame.lookAt(position, Vector3.new(centre.X, position.Y, centre.Z))
-		slab.Color = shade
-		slab.Transparency = transparency
-	end
+		local e = emitters[i]
+		--[[
+			⚠️ RATE IS AN OVERDRAW BUDGET, NOT A DENSITY DIAL.
 
-	for _, e in ipairs(emitters) do
-		e.Rate = 3 + 9 * p
-		e.Size = NumberSequence.new(140 + 120 * p, 280 + 260 * p)
+			rate x lifetime x emitters = particles alive, and each of these sprites subtends ~40° of view at
+			the render distance. Getting this wrong is how the storm kills a phone, and the storm is already
+			this game's most expensive moment.
+
+			An earlier setting here read 2.5 + 5.5p, which came out at 500-1100 alive - roughly four times
+			the overdraw of the version before it, in the name of density. Held to ~150-260 instead. If the
+			bank looks thin, raise PARTICLE_MIN/MAX (one draw each) before raising this (a draw per particle).
+		]]
+		e.Rate = 0.7 + 1.1 * p
+		e.Size = NumberSequence.new(
+			(PARTICLE_MIN + 30 * p) * sizeScale,
+			(PARTICLE_MAX + 70 * p) * sizeScale)
 		e.Color = ColorSequence.new(shade)
-		local floor = 0.66 - 0.36 * p
 		e.Transparency = NumberSequence.new({
 			NumberSequenceKeypoint.new(0, 1),
-			NumberSequenceKeypoint.new(0.3, floor),
-			NumberSequenceKeypoint.new(0.7, floor),
+			NumberSequenceKeypoint.new(0.18, alpha),
+			NumberSequenceKeypoint.new(0.82, alpha),
 			NumberSequenceKeypoint.new(1, 1),
 		})
 		e.Enabled = p > 0.02
 	end
 end
 
---- Bearing to look along to see the wall. There is no vessel or compass yet, so this is how you find it.
+--- Bearing to look along to see the wall. No vessel or compass yet, so this is how you find it.
 function CloudWallVFX.bearing(): number
-	return ASTERN_BEARING
+	return 180
+end
+
+--[[
+	Fill the bank NOW instead of waiting for particles to accumulate.
+
+	Necessary, not a nicety: with 12-20 second lifetimes a freshly started bank is nearly empty for the first
+	half-minute, which to anyone testing is indistinguishable from a wall that is not being drawn. That is
+	exactly the confusion this feature has already caused twice.
+
+	A fixed burst, deliberately NOT scaled by presence - the previous version multiplied by `smoothPresence`,
+	which is 0 on the frame `start()` runs, so it emitted 2 particles and did nothing useful.
+]]
+function CloudWallVFX.prime()
+	for _, e in ipairs(emitters) do
+		e:Emit(26)
+	end
 end
 
 function CloudWallVFX.report(): string
-	local distance, occlusion = placement()
-	local slab = slabs[1]
+	local distance, haze = simulated()
+	local p = smoothPresence
+	local elevation = ELEVATION_MIN_DEG + (ELEVATION_MAX_DEG - ELEVATION_MIN_DEG) * p
+	local alive = 0
+	for _, e in ipairs(emitters) do
+		alive += e.Rate * ((e.Lifetime.Min + e.Lifetime.Max) / 2)
+	end
+	local e1 = emitters[1]
 	return table.concat({
 		("intensity      %d"):format(attr("StormIntensity", 0)),
 		("presence       %.2f -> smoothed %.2f  (phase 1 lands at %.2f)"):format(
-			presence(), smoothPresence,
-			PRESENCE_FLOOR + (1 - PRESENCE_FLOOR) * ((1 / 4) ^ PRESENCE_CURVE)),
-		("true distance  %.0f studs"):format(attr("StormDistance", 4200)),
-		("drawn at       %.0f studs"):format(distance),
-		--[[
-			🔴 THE NUMBER THAT MATTERS. Above ~0.6 the wall is erased by the fog in front of it, which is
-			exactly how the first version came to be invisible while every other value read correct.
-		]]
-		("fog occlusion  %.0f%%  (target %.0f%%)  %s"):format(
-			occlusion * 100, TARGET_OCCLUSION * 100,
-			occlusion > 0.6 and "<-- TOO FOGGY, cannot be seen" or "ok"),
-		("geometry       %d slabs across %d deg, %s"):format(
-			#slabs, ARC_DEGREES, slab and ("%.0f x %.0f each, transparency %.2f"):format(
-				slab.Size.X, slab.Size.Y, slab.Transparency) or "not built"),
-		("churn          %d emitters, rate %.1f"):format(#emitters, emitters[1] and emitters[1].Rate or -1),
-		("in Workspace   %s  (NOT camera-parented - see the header)"):format(
-			tostring(workspace:FindFirstChild("CloudWall") ~= nil)),
-		("look toward    bearing %d (0 = +Z north, so this is -Z)"):format(ASTERN_BEARING),
+			presence(), p, PRESENCE_FLOOR + (1 - PRESENCE_FLOOR) * ((1 / 4) ^ PRESENCE_CURVE)),
+		("DRAWN AT       %d studs  (fixed - near enough that nothing can cull it)"):format(RENDER_DISTANCE),
+		("pretending     %.0f studs, haze %.0f%% applied by hand"):format(distance, haze * 100),
+		("apparent size  %d deg wide, %.0f deg tall"):format(ARC_DEGREES, elevation),
+		("particles      ~%.0f alive, %.0f..%.0f studs each, alpha %.2f"):format(
+			alive,
+			e1 and e1.Size.Keypoints[1].Value or 0,
+			e1 and e1.Size.Keypoints[2].Value or 0,
+			e1 and e1.Transparency.Keypoints[2].Value or 0),
+		("colour         %s"):format(e1 and tostring(e1.Color.Keypoints[1].Value) or "?"),
+		("emitting       %s"):format(tostring(e1 and e1.Enabled)),
+		("NO GEOMETRY    every part is Transparency 1; only particles are visible"),
+		("look toward    bearing 180 (0 = +Z north, so this is -Z)"),
 		("running        %s"):format(tostring(connection ~= nil)),
 	}, "\n")
 end

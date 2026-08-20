@@ -146,10 +146,48 @@ studs, copying the pattern `StormVFX` uses for rain. That pattern is right for r
 tens of studs from the lens - it is a **viewmodel** technique - and wrong for a kilometre-distant world-scale
 object (finding 0016).
 
-The real mistake was betting an important silhouette entirely on one uncertain rendering mechanism.
-Rewritten **geometry first**: nine anchored slabs in Workspace forming a 200-degree arc, which are guaranteed
-to render, with particles demoted to churn on the top edge so the silhouette is ragged rather than a clean
-rectangle. If the particles fail for any reason, the wall is still there.
+Attempt two was slab geometry in Workspace - which DID render, and read as flat grey cards with hard
+vertical lines between them. Two causes, and neither was tunable. The segments overlapped (a factor added to
+hide gaps), and two surfaces at 39% transparency composite into a visibly *darker* strip, so the gap-hiding
+became the artefact. Worse and less obvious: on a 200-degree arc, adjacent slabs face 22 degrees apart, so
+each catches the directional light differently and every boundary becomes a crease.
+
+The lesson worth keeping is that **a flat transparent surface always reads as a card**: hard silhouette edge,
+uniform interior, the opposite of cloud. Overlap to hide the seams and you get bands instead of lines, which
+is worse. Cloud needs SOFT EDGES, and there are only two ways to get them - alpha-faded particles, or real
+cloud art with an alpha channel.
+
+Attempt three: particles only, no geometry, at their true ~1000 studs. **Nothing visible at all** - while
+the slabs from attempt 2 had rendered fine at that exact distance. So the failure is specific to particles at
+range, with two plausible causes I could not distinguish without eyes on the scene: Roblox culling distant
+emitters, or a cap on rendered particle size far below the ~1000 studs the property happily accepts.
+
+Attempt four, which shipped: **drawn near, made to look far.** Rather than gamble a fifth attempt on picking
+the right cause, the bank is drawn at a fixed **340 studs** with modest 75-257 stud particles, which defeats
+both candidates at once. Apparent distance is then produced the way it actually reaches the eye: width and
+height are authored as **angles** (140 degrees wide, 19-41 degrees tall) and converted at the render distance,
+and **haze is applied by hand** - the colour blended toward the fog colour and opacity reduced by the
+occlusion the *pretend* distance implies, since real fog cannot do that from 340 studs. This is the trick
+every skybox uses, and it has a real bonus: fog can no longer erase the wall, because haze is now applied
+deliberately instead of suffered. What it gives up is parallax, which at a simulated kilometre is
+imperceptible.
+
+The construction is still particles only, as the user asked:
+Seven emitters spread over 5200 studs astern in a Workspace folder, parts at `Transparency = 1` so nothing
+but particles is ever visible. Long 14-24 second lifetimes and a low rate, so the bank ACCUMULATES into a
+standing mass rather than streaming past - anything fast enough to see moving reads as smoke from a fire.
+`LightInfluence` at 0.55 rather than 1: fully lit it went almost black under a storm sky and vanished against
+it, fully unlit it floated free of the lighting. At phase 1 the bank is 5497 studs wide - about 140 degrees -
+and 35 degrees tall. A `prime()` burst fills it on start and at every band crossing, because a bank filling
+over its own 20-second lifetime is indistinguishable from one that is not being drawn.
+
+One thing caught by measurement rather than by eye, twice: rate is an **overdraw budget**, not a density
+dial. rate x lifetime x emitters = particles alive, and each sprite subtends ~40 degrees of view at the render
+distance. The first setting gave ~390 alive; a later one, raised in the name of density, gave 500-1100 -
+roughly four times the overdraw of the version it replaced. Both were caught by reading the numbers back
+rather than by looking, which is the only way this kind of mistake surfaces before a phone finds it. Held to
+128-252 across the phases. Density is bought with SIZE, which costs one draw, not with COUNT, which costs a
+draw each - so if the bank looks thin, the particles get bigger, not more numerous.
 
 Two supporting facts found on the way: `Part.Size` silently **clamps at 2048** studs (asking 3000 returns
 2048), so a horizon-spanning wall must be several parts; and a *narrow* wall is indistinguishable from a
@@ -176,6 +214,39 @@ than the bolt line is.
 was gone. Cleanup is now an explicit allowlist scoped to Workspace and SoundService and never touches the
 containers where real code lives. Finding 0015, high, plus a persistent memory - deleting an instance in a
 synced place is a destructive filesystem operation, not a scene tidy.
+
+**AND THEN IT WAS TOO LIGHT** - approved after a final pass. The lightness had three separate sources, and
+changing any one alone would only have got halfway. The palette's pale end was 158,166,176, practically white,
+when even a distant front is dark - that is what makes it a front rather than a cloud. The haze blend was the
+main offender: its factor was 0.75, so at 55% haze it dragged the colour 41% of the way toward the fog colour,
+which in fair weather is a LIGHT grey - meaning the further away the front, the whiter it went, exactly
+backwards. And `LightInfluence` at 0.5 let bright daylight wash it out, when the front is supposed to look
+dark AT NOON. Fixed all three: luminance now falls 0.324 / 0.231 / 0.187 / 0.106 / 0.042 across the phases and
+transparency roughly doubled in opacity, while particle counts stayed put so there was no overdraw regression.
+
+Deliberately still not opaque. Density has to come from many overlapping soft sprites, because that is what
+produces a cloud EDGE - push individual particles to solid and each becomes legible as a blob, which is the
+particle form of the flat-card problem that caused the grey lines in attempt 2.
+
+**TWO MORE FOG ERASURES, after the wall was approved.** The user reported the wall "disappears too fast at
+the last step" and that lightning "is only on me, not in distance". Same root cause as finding 0014, and it
+is now a class of bug seen three times: anything drawn at or beyond `FogEnd` is erased, and `FogEnd` is not a
+constant - the composer drives it from 2550 studs in fair weather down to **330 inside The Wall**.
+
+The wall had been pinned at a *fixed* 340 studs, which was the fix for the first erasure and introduced the
+second: fine for phases 0-3, then completely wiped at phase 4 when the fog closed inside it. Lightning was
+drawn at its true 400-2600 studs, so in Storm conditions (`FogEnd` 1280) every strike beyond ~1300 studs was
+fogged out entirely - which is exactly why only the flash on the player was landing.
+
+Both now derive a render distance from the *current* `FogEnd` and scale their geometry by
+`renderDistance / trueDistance`, leaving apparent angular size unchanged. True distance still drives
+everything physical - thunder delay, flash strength, camera shake, haze - and only the drawing moves.
+
+The user also asked that the wall "come more and more", which was fair: elevation topped out at 42 degrees, so
+it read as a distant band no matter how close the front got. Now 14 to **76 degrees**, and the arc widens from
+156 to **230 degrees** - past the sides, so at the last phase it engulfs rather than standing off. The arc
+placement is only safe because particles are camera-facing billboards; there are no facets to catch the light
+differently, so the crease problem that killed the slab version cannot recur.
 
 **NOT DONE**: screen-level rain streaks.
 
@@ -218,7 +289,10 @@ LightningVFX AMBIENT_GAIN    0.55   how hard a strike lights the world. THE dial
 Lightning.flashExposure      floor 0.45 + 1.15*sqrt(near) - raise the FLOOR for more distant light
 CloudWallVFX TARGET_OCCLUSION 0.35  how much fog sits in front of the wall. >0.6 and it disappears
 CloudWallVFX PRESENCE_CURVE  0.55   lower = more wall earlier. Phase 1 currently lands at 0.56
-CloudWallVFX ARC_DEGREES     200    narrower is prettier and much easier to miss entirely
+CloudWallVFX ARC_DEGREES     140    narrower is much easier to miss entirely
+CloudWallVFX STORM_GREY/BLACK the colour ramp ends. Darker still? Start here
+CloudWallVFX haze * 0.28      how much distance BLEACHES it. Was 0.75 and far too pale
+CloudWallVFX e.Rate          an OVERDRAW budget. Prefer bigger sprites over more of them
 LightningVFX LIGHT_GAIN      14     the local PointLight; range caps at 120 studs engine-side
 StormAudio VOICES[x].spread  detune width — wider for short clips, narrow for long ones
 LocalWeather.SHOWER_THRESHOLD 0.72  15% wet. 0.62 gave 30%, which was a wet climate
@@ -228,8 +302,6 @@ Lightning.SOUND_STUDS_PER_SECOND 300  legibility, not physics — do not "correc
 ```
 
 ### Open
-
-- Whether the particle wall reads as cloud or as smoke — the escalation is a textured arc
 - A longer rain recording (6–15 s) would let the voice count drop from 4 to 2
 - `PointLight.Shadows = true` on the camera-local flash light is a mobile tier-down candidate; unmeasured
 - Non-admin refusal end-to-end test still needs a stable Play session

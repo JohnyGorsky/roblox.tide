@@ -9,3 +9,27 @@
 **Where:** studio_game/ReplicatedStorage/CloudWallVFX.luau
 **Repro / notes:** _TODO_
 **Fix idea:** _TODO_
+
+## Update — this is a CLASS of bug, now seen three times
+
+Same root cause, three different shapes. Anything drawn at or beyond `Lighting.FogEnd` is erased, and
+`FogEnd` is not a constant — the composer drives it from the sea state, so it ranges from 2550 studs in fair
+weather down to **330 inside The Wall**.
+
+| # | What | Symptom |
+|---|---|---|
+| 1 | Cloud wall pinned at 82% of `FogEnd` | invisible at the distances a crew watches from (81% occluded) |
+| 2 | Cloud wall pinned at a **fixed** 340 studs | fine for phases 0–3, then vanished at phase 4 when `FogEnd` closed to 330 — *below* the render distance |
+| 3 | Lightning bolts drawn at their true 400–2600 studs | distant strikes fogged out entirely in a storm (`FogEnd` 1280), so only the flash on the player landed |
+
+Case 2 is the instructive one: the fix for case 1 introduced it. Pinning to a constant is just as wrong as
+pinning to a fraction — the fog moves, and a constant cannot follow it.
+
+**The rule:** anything that must be SEEN gets a render distance derived from the *current* `FogEnd`, and is
+scaled by `renderDistance / trueDistance` so its apparent angular size is unchanged. True distance still
+drives everything physical — thunder delay, flash strength, shake, haze — and only the *drawing* moves. Both
+`CloudWallVFX` and `LightningVFX` now do exactly this.
+
+Corollary worth keeping: put the occlusion, or the render distance against `FogEnd`, in the effect's own
+report. All three cases presented as "invisible while every other value reads correct", which is close to
+undiagnosable otherwise.

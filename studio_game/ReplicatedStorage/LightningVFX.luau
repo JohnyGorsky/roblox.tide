@@ -165,16 +165,38 @@ end
 ]]
 local function drawBolt(strike: Lightning.Strike, origin: Vector3)
 	local dir = Lightning.directionOf(strike)
-	local base = origin + dir * strike.distance
+
+	--[[
+		🔴 DRAWN INSIDE THE FOG, NOT AT ITS TRUE DISTANCE.
+
+		Distant lightning was invisible - the user saw the flash light *them* but nothing out at range - and
+		the cause is the same one that erased the cloud wall (finding 0014). In a storm the composed `FogEnd`
+		closes to 1280 studs, and inside The Wall to 330. A strike rolled at 2000 studs was therefore being
+		drawn well beyond the fog and wiped out completely, including its Neon flare, which fog affects like
+		anything else.
+
+		So the geometry is pulled inside the fog and SCALED DOWN by the same ratio, which leaves its apparent
+		angular size unchanged - a bolt at 2000 studs drawn at 700 studs at 35% scale subtends exactly what
+		it would have. The player cannot tell, and it can no longer be fogged out.
+
+		The TRUE distance still drives everything that should depend on it: thunder delay, flash strength,
+		camera shake, and the fault roll. Only the drawing moves.
+	]]
+	local visibleLimit = math.max(120, Lighting.FogEnd * 0.55)
+	local renderAt = math.min(strike.distance, visibleLimit)
+	local scale = renderAt / math.max(1, strike.distance)
+
+	local base = origin + dir * renderAt
 	local model = Instance.new("Model")
 	model.Name = "Bolt"
 	model.Parent = workspace
 
 	local segments = 5
-	local topHeight = 520 + 380 * strike.magnitude
-	local width = 2.2 + 5 * strike.magnitude
+	local topHeight = (520 + 380 * strike.magnitude) * scale
+	-- a minimum width, or a heavily scaled-down bolt becomes sub-pixel and disappears for a different reason
+	local width = math.max(1.6, (2.2 + 5 * strike.magnitude) * scale)
 	-- Nearer strikes look wider simply by being nearer; scale the geometry only with magnitude.
-	local drift = math.max(18, strike.distance * 0.04)
+	local drift = math.max(18, strike.distance * 0.04) * scale
 
 	local previous = base + Vector3.new(0, topHeight, 0)
 	for i = 1, segments do
@@ -247,7 +269,7 @@ local function drawBolt(strike: Lightning.Strike, origin: Vector3)
 	flare.Material = Enum.Material.Neon
 	flare.Color = BOLT_PALE
 	-- scales with distance so it holds a roughly constant ANGULAR size; a fixed radius vanishes far away
-	local flareRadius = (55 + 70 * strike.magnitude) * (0.6 + strike.distance / 1600)
+	local flareRadius = (55 + 70 * strike.magnitude) * (0.6 + strike.distance / 1600) * scale
 	flare.Size = Vector3.one * flareRadius
 	flare.Transparency = 0.25
 	flare.Position = base + Vector3.new(0, flareRadius * 0.25, 0)

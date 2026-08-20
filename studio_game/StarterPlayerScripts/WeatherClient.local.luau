@@ -43,6 +43,28 @@ CloudWallVFX.start()
 StormAudio.start()
 
 --[[
+	Prime the cloud bank.
+
+	Its particles have 14-24 second lifetimes and a low rate, because density is meant to come from
+	accumulation rather than from a firehose. That means a freshly started bank is nearly EMPTY for the first
+	half-minute - which, to anyone testing, is indistinguishable from a wall that is not being drawn at all.
+	`prime()` emits a burst up front so it is there immediately.
+
+	Re-primed whenever the storm crosses a band, for the same reason: presence jumps, and waiting for the
+	extra density to accumulate would make the escalation lag the rest of the storm by half a minute.
+]]
+task.defer(function()
+	for _ = 1, 3 do
+		CloudWallVFX.prime()
+		task.wait(0.4)
+	end
+end)
+
+workspace:GetAttributeChangedSignal("StormIntensity"):Connect(function()
+	CloudWallVFX.prime()
+end)
+
+--[[
 	Audio is levelled on its own loop rather than inside the VFX step.
 
 	10 Hz is plenty for a volume ramp and costs nothing, and keeping it off RenderStepped means the wind does
