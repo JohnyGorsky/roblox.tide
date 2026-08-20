@@ -47,6 +47,8 @@ The presets. Each is one row of data driving water, fog, sky and wave field toge
 | Item | What it is | GB | Source |
 |---|---|---|---|
 | `SeaStates` data module | The preset table itself: per state, terrain-water properties + fog + wave-field amplitude/frequency + audio bed | ❌ | code |
+| **`atmosphere` block per state** | Density, Haze, Glare, Color, Decay. **This is the lever that actually changes the sea's colour** — `WaterColor` is weak by comparison (finding 1 below). Not yet in the module | ❌ | code |
+| Transient weather response | A squall or lightning flash momentarily shifting the water read, so colour is not limited to five discrete steps | ❌ | code |
 | Dead Calm | Glass water, long sightlines, unnerving. A special-night state (see 07) | ❌ | code |
 | Light Swell | The default cruising sea. Gentle roll, readable horizon | ❌ | code |
 | Choppy | Working sea. Boat pitches, spray starts, fog closes in | ❌ | code |

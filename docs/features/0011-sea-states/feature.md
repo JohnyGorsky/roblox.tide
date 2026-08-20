@@ -35,7 +35,12 @@ the storm carries no threat.
       Roblox's clear-day sky overcast, so the cold palette cannot be reached without them
       (`ASSET-SKY-OVERCAST`, finding 0006)
 - [ ] Horizon treatment beyond fog (cloud bank, silhouettes) — needs art, deferred
-- [ ] Wave-height sampler so physics can agree with the visuals — separate feature
+- [ ] **`atmosphere` block per state** — Density, Haze, Glare, Color, Decay. Currently `SeaStates` drives
+      only fog, but job 007 proved Atmosphere and the sky dominate the sea's apparent colour, so without
+      this the states cannot actually change how the water reads
+- [ ] Transient weather response beyond the five states: a rain squall or lightning flash briefly altering
+      the water read, rather than colour only ever stepping between states
+- [ ] Wave-height sampler so physics can agree with the visuals — GAME-0014
 
 ## Out of scope
 

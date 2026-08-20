@@ -71,9 +71,16 @@ the reverse. For each sea state:
 
 Two known mismatches to decide about rather than discover later:
 
-- **Direction.** Terrain water has no controllable wave direction; ours does. Either keep the field
-  near-omnidirectional to match, or accept that a directional swell will not line up with the visual
-  surface and choose a direction that reads acceptably.
+- **Direction — decided.** A **dominant swell direction plus a spread that widens in rougher states**
+  (2026-08-20). This is what real seas do, it is what `directionSpread` in `SeaStates` already implies,
+  and it makes the helm a skill: heading into the swell, across it, or running with it must feel
+  different. The visual mismatch is accepted, and it hides itself — spread is *narrowest* in the calm
+  states, where amplitude is too small for anyone to notice the disagreement, and *widest* in The Wall,
+  where the sea is confused enough that no pattern is legible anyway.
+  Per-state direction is a new field. **Correcting my own wording from the plan:** the swell travels
+  broadly *with* the direction of travel — northward, arriving from astern. Waves "opposing travel" would
+  arrive from ahead, which is the opposite of a storm pushing you from behind. So: a **following sea**,
+  which is also the more interesting one to steer, because following seas make a small vessel yaw.
 - **Choppiness.** `choppiness` and `directionSpread` in `SeaStates` have no visual counterpart at all.
   They will only ever be felt through the boat, which is fine — but they must not be tuned by eye.
 

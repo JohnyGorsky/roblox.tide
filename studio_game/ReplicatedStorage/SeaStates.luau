@@ -26,6 +26,14 @@ export type WaveSpec = {
 	speed: number, -- studs/second of crest travel
 	choppiness: number, -- 0 = rolling swell, 1 = steep and broken
 	directionSpread: number, -- 0 = one direction, 1 = confused sea
+	--[[
+		Heading the waves TRAVEL TOWARD, in degrees. 0 = +Z (north), 90 = +X (east).
+
+		Progress is broadly northward and the storm chases from astern, so the swell runs north too:
+		a FOLLOWING sea, arriving from behind. That is what "the storm is pushing us" feels like, and
+		it is also the more interesting sea to steer, because following seas make a small vessel yaw.
+	]]
+	directionDeg: number,
 }
 
 export type WaterSpec = {
@@ -87,7 +95,7 @@ SeaStates.DeadCalm = {
 		outdoorAmbient = 1.0,
 		brightness = 2.6,
 	},
-	wave = { amplitude = 0.15, length = 90, speed = 4, choppiness = 0.0, directionSpread = 0.1 },
+	wave = { amplitude = 0.15, length = 90, speed = 4, choppiness = 0.0, directionSpread = 0.1, directionDeg = 0 },
 	spray = 0.0,
 	audioBed = "sea_dead_calm",
 } :: SeaState
@@ -111,7 +119,7 @@ SeaStates.LightSwell = {
 		outdoorAmbient = 1.0,
 		brightness = 3.0,
 	},
-	wave = { amplitude = 0.8, length = 70, speed = 11, choppiness = 0.2, directionSpread = 0.2 },
+	wave = { amplitude = 0.8, length = 70, speed = 11, choppiness = 0.2, directionSpread = 0.2, directionDeg = 8 },
 	spray = 0.1,
 	audioBed = "sea_light_swell",
 } :: SeaState
@@ -135,7 +143,7 @@ SeaStates.Choppy = {
 		outdoorAmbient = 0.85,
 		brightness = 2.4,
 	},
-	wave = { amplitude = 2.0, length = 55, speed = 15, choppiness = 0.5, directionSpread = 0.4 },
+	wave = { amplitude = 2.0, length = 55, speed = 15, choppiness = 0.5, directionSpread = 0.4, directionDeg = 15 },
 	spray = 0.35,
 	audioBed = "sea_choppy",
 } :: SeaState
@@ -159,7 +167,7 @@ SeaStates.Storm = {
 		outdoorAmbient = 0.55,
 		brightness = 1.6,
 	},
-	wave = { amplitude = 4.5, length = 45, speed = 20, choppiness = 0.8, directionSpread = 0.6 },
+	wave = { amplitude = 4.5, length = 45, speed = 20, choppiness = 0.8, directionSpread = 0.6, directionDeg = 22 },
 	spray = 0.75,
 	audioBed = "sea_storm",
 } :: SeaState
@@ -186,7 +194,7 @@ SeaStates.TheWall = {
 		outdoorAmbient = 0.35,
 		brightness = 1.0,
 	},
-	wave = { amplitude = 7.5, length = 38, speed = 26, choppiness = 1.0, directionSpread = 0.9 },
+	wave = { amplitude = 7.5, length = 38, speed = 26, choppiness = 1.0, directionSpread = 0.9, directionDeg = 30 },
 	spray = 1.0,
 	audioBed = "sea_the_wall",
 } :: SeaState
@@ -270,6 +278,7 @@ function SeaStates.lerp(a: SeaState, b: SeaState, t: number): SeaState
 			speed = n(a.wave.speed, b.wave.speed),
 			choppiness = n(a.wave.choppiness, b.wave.choppiness),
 			directionSpread = n(a.wave.directionSpread, b.wave.directionSpread),
+			directionDeg = n(a.wave.directionDeg, b.wave.directionDeg),
 		},
 		spray = n(a.spray, b.spray),
 		audioBed = dominant.audioBed,

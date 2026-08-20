@@ -63,7 +63,7 @@ The answer must be "nothing."
 | Keyboard shortcut | Open/close without hunting for the button | ❌ | code |
 | Mobile layout | Landscape, thumb-reachable, avoiding the reserved touch rects | ⚠️ | code |
 
-## B. Sea tools — 5 items
+## B. Sea tools — 7 items
 
 The first section to build, since [group 01](01-sea.md) already has a state table to drive.
 
@@ -72,6 +72,8 @@ The first section to build, since [group 01](01-sea.md) already has a state tabl
 | Sea state picker | Buttons for Dead Calm → The Wall, applying instantly | ❌ | code |
 | State blend slider | Scrub between two states to find intermediate looks | ❌ | code |
 | Live water sliders | `WaveSize`, `WaveSpeed`, `Reflectance`, `Transparency`, fog start/end | ❌ | code |
+| **Atmosphere sliders** | Density, Offset, Haze, Glare — **the real colour lever**, warns above Haze 2 where wave detail dies | ❌ | code |
+| **Palette colour pickers** | Water, fog, Atmosphere colour and decay, chosen from the visual-design palette so eye-tuning cannot drift off-palette | ❌ | code |
 | Copy-as-Luau | Export the current values as a `SeaStates` entry, so tuning by eye becomes code | ❌ | code |
 | Wave field overlay | Toggle the debug markers that show the maths against the visual water | ❌ | code |
 

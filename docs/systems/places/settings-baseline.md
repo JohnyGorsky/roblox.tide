@@ -67,6 +67,10 @@ turned out to be read-only to scripts; see section 2.
 | `Terrain.WaterTransparency` | `0.42` | prov. — you can see the harbour bottom; the open sea cannot |
 | `Terrain.WaterWaveSize` | `0.06` | prov. — sheltered. The lobby must not look like the open sea |
 | `Terrain.WaterWaveSpeed` | `6` | prov. |
+| `Atmosphere.Color` | `110, 142, 153` | prov. — Cold Sea Mist. Job 010 originally used an ad-hoc `150,165,175`; settled on-palette in job 013 |
+| `Atmosphere.Decay` | `75, 89, 100` | prov. — Wet Steel (was an ad-hoc `86,100,112`) |
+| `Atmosphere.Density` / `Haze` | `0.32` / `0.9` | prov. — **Haze above ~2 flattens all wave detail** (job 007) |
+| `Lighting.FogColor` | `110, 142, 153` | prov. — Cold Sea Mist. ⚠️ Was left at Roblox's default `192,192,192` until job 010, which erased the whole scene to grey. **Fog has two properties that matter; setting only the distance leaves a colour that can erase the view** |
 
 ---
 

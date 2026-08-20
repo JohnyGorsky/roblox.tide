@@ -217,10 +217,16 @@ tools.copyAsLuau = {
 			"},",
 		}
 		if atm then
-			table.insert(lines, "-- Atmosphere is not part of SeaStates yet; add these if it becomes so:")
-			table.insert(lines, ("-- density = %s, haze = %s, glare = %s")
-				:format(round(atm.Density, 3), round(atm.Haze, 2), round(atm.Glare, 2)))
-			table.insert(lines, ("-- color = %s, decay = %s"):format(rgb(atm.Color), rgb(atm.Decay)))
+			-- Real pasteable fields, not comments: this block is what makes a value found by dragging a
+			-- slider survive the session. Add the matching `atmosphere` field to SeaStates (todo 0004).
+			table.insert(lines, "atmosphere = {")
+			table.insert(lines, ("\tdensity = %s,"):format(round(atm.Density, 3)))
+			table.insert(lines, ("\toffset = %s,"):format(round(atm.Offset, 3)))
+			table.insert(lines, ("\thaze = %s,"):format(round(atm.Haze, 2)))
+			table.insert(lines, ("\tglare = %s,"):format(round(atm.Glare, 2)))
+			table.insert(lines, ("\tcolor = %s,"):format(rgb(atm.Color)))
+			table.insert(lines, ("\tdecay = %s,"):format(rgb(atm.Decay)))
+			table.insert(lines, "},")
 		end
 		return true, table.concat(lines, "\n")
 	end,
@@ -246,6 +252,129 @@ tools.readSea = {
 		}, "\n")
 	end,
 }
+
+-- ---------------------------------------------------------------------------
+-- Atmosphere: the real colour lever
+-- ---------------------------------------------------------------------------
+--[[
+	Job 007 tried four ways to recolour the ocean through water properties and fog and all four failed -
+	the sky and Atmosphere win. So these are the controls that actually change how the sea reads, and
+	WaterColor is the weak one. Measured landmarks from that job, worth knowing while dragging:
+	  Haze 3.0  flattens ALL wave detail (technically the right colour, visually dead)
+	  Haze 1.1  keeps depth
+	  storm treatment: Density 0.62, Haze 2.2
+]]
+
+local function atmosphere(): Instance?
+	return Lighting:FindFirstChildOfClass("Atmosphere")
+end
+
+tools.setAtmosphere = {
+	id = "setAtmosphere",
+	label = "Atmosphere",
+	section = "Sea",
+	scope = "global",
+	controls = {
+		kind = "sliders",
+		fields = {
+			{ key = "density", label = "Density", min = 0, max = 1, step = 0.02 },
+			{ key = "offset", label = "Offset", min = 0, max = 1, step = 0.05 },
+			{ key = "haze", label = "Haze (>2 kills wave detail)", min = 0, max = 5, step = 0.1 },
+			{ key = "glare", label = "Glare", min = 0, max = 2, step = 0.05 },
+		},
+	},
+	run = function(_player: Player, args: any)
+		local atm = atmosphere()
+		if not atm then
+			return false, "no Atmosphere in Lighting"
+		end
+		local key, value = args and args.key, args and args.value
+		if typeof(key) ~= "string" or typeof(value) ~= "number" then
+			return false, "expected key and numeric value"
+		end
+		local a = atm :: any
+		if key == "density" then
+			a.Density = math.clamp(value, 0, 1)
+		elseif key == "offset" then
+			a.Offset = math.clamp(value, 0, 1)
+		elseif key == "haze" then
+			a.Haze = math.clamp(value, 0, 5)
+		elseif key == "glare" then
+			a.Glare = math.clamp(value, -1, 2)
+		else
+			return false, ("unknown atmosphere key %q"):format(key)
+		end
+		local note = (key == "haze" and value > 2) and "  (warning: above ~2 the swell stops reading)" or ""
+		return true, ("%s = %.2f%s"):format(key, value, note)
+	end,
+}
+
+--[[
+	Colours come from the palette, not from freeform RGB.
+
+	Two reasons: tuning by eye cannot drift off-palette, and a choice list works with a thumb whereas nine
+	numeric fields do not. If a colour is genuinely needed that is not here, add it to the palette in
+	docs/game/visual-design.md first - that is the point.
+]]
+local PALETTE: { [string]: Color3 } = {
+	AbyssNavy = Color3.fromRGB(11, 30, 45),
+	DeepOcean = Color3.fromRGB(18, 53, 74),
+	StormTeal = Color3.fromRGB(30, 90, 110),
+	ColdSeaMist = Color3.fromRGB(110, 142, 153),
+	ThunderCloud = Color3.fromRGB(42, 49, 59),
+	WetSteel = Color3.fromRGB(75, 89, 100),
+	FogGrey = Color3.fromRGB(140, 154, 163),
+	LightningPale = Color3.fromRGB(220, 234, 242),
+}
+local PALETTE_ORDER = {
+	"AbyssNavy", "DeepOcean", "StormTeal", "ColdSeaMist",
+	"ThunderCloud", "WetSteel", "FogGrey", "LightningPale",
+}
+
+local function paletteTool(id: string, label: string, apply: (Color3) -> ())
+	return {
+		id = id,
+		label = label,
+		section = "Sea",
+		scope = "global",
+		controls = { kind = "choice", options = PALETTE_ORDER },
+		run = function(_player: Player, args: any)
+			local name = args and args.value
+			if typeof(name) ~= "string" then
+				return false, "expected a palette colour name"
+			end
+			local c = PALETTE[name]
+			if not c then
+				return false, ("%q is not in the palette"):format(tostring(name))
+			end
+			apply(c)
+			return true, ("%s = %s (%d,%d,%d)"):format(label, name,
+				math.round(c.R * 255), math.round(c.G * 255), math.round(c.B * 255))
+		end,
+	}
+end
+
+tools.waterColor = paletteTool("waterColor", "Water colour", function(c)
+	workspace.Terrain.WaterColor = c
+end)
+
+tools.fogColor = paletteTool("fogColor", "Fog colour", function(c)
+	Lighting.FogColor = c
+end)
+
+tools.atmosphereColor = paletteTool("atmosphereColor", "Atmosphere colour", function(c)
+	local atm = atmosphere()
+	if atm then
+		(atm :: any).Color = c
+	end
+end)
+
+tools.atmosphereDecay = paletteTool("atmosphereDecay", "Atmosphere decay", function(c)
+	local atm = atmosphere()
+	if atm then
+		(atm :: any).Decay = c
+	end
+end)
 
 tools.placeInfo = {
 	id = "placeInfo",

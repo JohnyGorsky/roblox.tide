@@ -69,7 +69,7 @@ Named nights give players stories to tell.
 | Rare strike effects | Radar disruption, generator surge, system fault, direct hit | ❌ | code |
 | Rain curtain / squall line | A moving wall of rain, also usable as wrap concealment | ⚠️ | studio |
 | Fog ramp per level | FogEnd/colour tied to intensity | ❌ | code |
-| Sea-state coupling | Storm level selects the sea state from group 01 | ❌ | code |
+| Sea-state coupling | Storm level selects the sea state from group 01 — which carries the water **and** Atmosphere values, so the sea recolours as the weather turns | ❌ | code |
 | Caught-by-storm consequence | Escalating damage + system faults, escapable in ~30–60s (decision [0014](../decisions/0014-storm-consequence.md)) | ❌ | code |
 | Storm audio bed | Rumble, wind, rain-on-water, rain-on-metal, hull creaks | ⚠️ | sound |
 | Storm warning UI | Temporary HUD alert: `STORM FRONT: 0.8 KM` | ⚠️ | code |
