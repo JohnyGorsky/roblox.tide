@@ -259,7 +259,24 @@ local function buildVessel()
 	local trim = Instance.new("Torque")
 	trim.Name = "Trim"
 	trim.Attachment0 = driveAt
-	trim.RelativeTo = Enum.ActuatorRelativeTo.Attachment0
+	--[[
+		🔴 WORLD-relative, aimed along a HORIZONTAL axis each frame. This was `Attachment0`-relative about
+		local X, and it was the single worst bug in the vessel.
+
+		Measured: wheel dead amidships, flat water, throttle open - she yawed 178 degrees in 8 seconds.
+
+		The trim torque is 4,090,732, by far the largest force on the hull. Applied about the hull's LOCAL X,
+		it only takes a few degrees of roll for local X to gain a world-Y component, and a fraction of a
+		4-million torque is an enormous yaw moment. At 5.6 degrees of roll that is ~400,000 of unintended yaw -
+		nearly three times the rudder's entire authority.
+
+		And it closes a loop: yaw -> centrifugal heel -> roll -> local X tilts further -> more yaw leaks.
+
+		Exactly the same failure as the heel torque, which I fixed without realising trim had it too. The
+		lesson worth keeping: a large torque applied in a body-relative frame leaks into every other axis the
+		body rotates about. If a torque should only ever act about one world axis, aim it in world space.
+	]]
+	trim.RelativeTo = Enum.ActuatorRelativeTo.World
 	trim.Torque = Vector3.zero
 	trim.Parent = hull
 	state.trim = trim
@@ -294,7 +311,24 @@ local function buildVessel()
 	local heel = Instance.new("Torque")
 	heel.Name = "Heel"
 	heel.Attachment0 = driveAt
-	heel.RelativeTo = Enum.ActuatorRelativeTo.Attachment0
+	--[[
+		🔴 WORLD-relative, and aimed along a HORIZONTAL axis each frame. This was `Attachment0`-relative
+		about local Z, and it made the boat SPIN UP TO 1.77 rad/s.
+
+		The failure is a positive feedback loop, and it is worth spelling out:
+
+		    heel torque about the hull's LOCAL Z
+		      -> hull rolls
+		      -> a rolled hull's local Z now has a world-Y COMPONENT
+		      -> the roll torque leaks into YAW
+		      -> more yaw raises the centrifugal heel term
+		      -> more heel torque -> more yaw ...
+
+		Aiming it along the hull's forward direction FLATTENED INTO THE HORIZONTAL PLANE makes it a pure roll
+		about a horizontal axis, with no world-Y component to leak, however far she is heeled. The loop cannot
+		close.
+	]]
+	heel.RelativeTo = Enum.ActuatorRelativeTo.World
 	heel.Torque = Vector3.zero
 	heel.Parent = hull
 	state.heel = heel
@@ -548,7 +582,18 @@ local function step(dt: number)
 	]]
 	if state.trim then
 		local t = math.max(throttle, 0)
-		state.trim.Torque = Vector3.new(state.spec.trimTorque * t, 0, 0)
+		--[[
+			Aimed along the hull's STARBOARD direction flattened to horizontal, so it is a pure pitch about a
+			horizontal axis and cannot leak into yaw at any angle of heel. Bow-up is a positive moment about
+			starboard.
+		]]
+		local right = hull.CFrame.RightVector
+		local flatRight = Vector3.new(right.X, 0, right.Z)
+		if flatRight.Magnitude > 0.01 then
+			state.trim.Torque = flatRight.Unit * (state.spec.trimTorque * t)
+		else
+			state.trim.Torque = Vector3.zero
+		end
 	end
 
 	--[[
@@ -585,7 +630,21 @@ local function step(dt: number)
 	local rudderT = VesselPhysics.rudderTorque(steer, forwardSpeed, state.spec.cruise, state.rudderAuthority)
 	local dampT = VesselPhysics.yawDamping(yawRate, forwardSpeed, state.spec.cruise, state.yawDamping)
 	if state.rudder then
-		state.rudder.Torque = Vector3.new(0, rudderT + dampT, 0)
+		--[[
+			🔴 HARD YAW CAP. Insurance, exactly like the thrust cap and the buoyancy force ceiling.
+
+			A coupling bug in the heel torque spun this hull to 1.77 rad/s - roughly 100 degrees a second,
+			six times its designed rate - and collapsed its speed. The loop is fixed, but a vehicle that CAN
+			run away is one bug from doing it again, and the driver pays.
+
+			Above 1.5x the designed rate the rudder stops helping and heavy extra damping is applied instead.
+		]]
+		local cap = state.spec.turnRate * 1.5
+		local total = rudderT + dampT
+		if math.abs(yawRate) > cap then
+			total = -math.sign(yawRate) * state.yawDamping * (math.abs(yawRate) - cap) * 4
+		end
+		state.rudder.Torque = Vector3.new(0, total, 0)
 	end
 
 	--[[
@@ -597,7 +656,18 @@ local function step(dt: number)
 	if state.heel then
 		local moment = VesselPhysics.heelMoment(
 			rudderT, yawRate, forwardSpeed, state.heelIn, state.heelOut)
-		state.heel.Torque = Vector3.new(0, 0, moment)
+		--[[
+			Aimed along the hull's forward direction FLATTENED to horizontal. A pure roll axis with no
+			world-Y component, so it cannot leak into yaw at any angle of heel - see the note on the
+			constraint. Forward is -Z, so rolling to starboard is a positive moment about the flattened
+			forward axis.
+		]]
+		local flat = Vector3.new(forward.X, 0, forward.Z)
+		if flat.Magnitude > 0.01 then
+			state.heel.Torque = flat.Unit * -moment
+		else
+			state.heel.Torque = Vector3.zero
+		end
 	end
 
 	-- FUEL

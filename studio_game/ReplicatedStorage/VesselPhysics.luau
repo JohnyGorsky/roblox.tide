@@ -362,10 +362,25 @@ end
 	"Wider turns at high speed" for free. A constant damping term would have given the opposite - radius
 	shrinking as she sped up, which is a car, not a boat.
 
-	`DAMP_FLOOR` keeps a little damping at rest so the hull cannot be spun on the spot by a rudder that has no
-	water flowing past it - "poor turning while nearly stationary", also from the doc.
+	`DAMP_FLOOR` is the damping that exists regardless of speed - the hull's bulk resisting rotation.
+
+	🔴 RAISED FROM 0.15 TO 0.5 AFTER MEASURING, and the reason is not the rudder.
+
+	Waves drive large roll and pitch rates, and rigid-body cross-axis coupling turns those into YAW. That is
+	genuine physics - a hull in a seaway really does yaw about, and "yawing" is a nautical word for exactly
+	this - but at 0.15 the measured result was 0.66 rad/s in Choppy, peaking at 0.90. Roughly 50 degrees a
+	second, uncontrollable, and she made no net progress round the turn because she was thrashing.
+
+	A real hull resists rotation far more than that: its whole lateral area has to be dragged sideways
+	through the water to yaw it. 0.5 reflects that, and it costs nothing at cruise:
+
+	    damping at cruise = damp * (FLOOR + (1 - FLOOR) * 1) = damp    <- unchanged, whatever FLOOR is
+	    damping at rest   = damp * FLOOR                              <- 3.3x higher than before
+
+	So the turn at speed is exactly as designed, wave-driven yaw is damped, and turning while barely moving
+	gets even weaker - which is the behaviour the doc asks for and the thing that stops her pivoting on the spot.
 ]]
-VesselPhysics.DAMP_FLOOR = 0.15
+VesselPhysics.DAMP_FLOOR = 0.5
 
 --- Torque the rudder makes. Scales with v^2, because a foil with no flow does nothing.
 function VesselPhysics.rudderTorque(steer: number, forwardSpeed: number, cruise: number, authority: number): number
