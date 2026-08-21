@@ -2,7 +2,7 @@
 
 **Project**: `roblox.tide`
 **Created**: 2026-08-21
-**Status**: Implemented, NOT VERIFIED — written and analyzer-clean; nothing has run (Studio Sync down, finding 0007)
+**Status**: Implemented and measured in a session 2026-08-21 — two items still need a hands-on look (compass orientation, damage-control hold)
 
 The storm's teeth — hull damage and system faults inside The Wall. Implements
 [decision 0014](../../docs/decisions/0014-storm-consequence.md).

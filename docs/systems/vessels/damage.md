@@ -90,9 +90,37 @@ re-breaks it on the next frame — damage control becomes a button that does not
 
 🔴 **The compass takes no fault, ever.** It is the floor beneath pillar 6. Threaten the chart instead.
 
-⚠️ **Nothing has been verified in a running session yet.** Studio Sync was down for the whole of job 022
-(finding 0007), so every number above is analyzer-clean and arithmetic-checked but has never ticked. Run the
-survival test before trusting any of it.
+## Verified 2026-08-21 (job 022)
+
+Measured in a running session, not judged by eye.
+
+| Check | Result |
+|---|---|
+Hold position at full exposure | **lost at 45.5 s** against 45 declared (101%) |
+Fault ladder thresholds | radar 9.6 s/20% · generator 18.5 s/40% · engine 27.6 s/60% · breach 34.4 s/75% — exact |
+Engine cut is transient | fired at 27.6 s, relit ~8 s later on its own |
+Escape run from distance 0 | **cleared the front at 27.9 s** with 74% of the hull left (26% spent) |
+Northward travel buys distance | steady state **+12.84 studs/s** measured against +12.94 theory — **99.2%** |
+Buoyancy converges under flooding | 62 s at 100% flooding in a Storm sea: amplitude 4.28 → 4.27 (growth 0.999), waterline held, max tilt 15° |
+Waterline at full flooding | 0.31 studs lower in Light Swell, 1.15 lower in a Storm sea |
+Loss path | engine dead, helm released, all four float forces zeroed, sinks upright, `ExpeditionOver` set |
+Lightning consumer | `[VESSEL] lightning raised generator -> generator` — job 018's dead fault rolls now bite |
+Compass tracks heading | card counter-rotated a heading sweeping 78.7°, `rotation = -heading` throughout |
+No heading on the wire | `VesselHeading` nil from a client; full client-visible attribute list audited |
+Admin panel | 44 tools, all scopes valid, **built exactly once** |
+
+### Still needs your eyes
+
+Two things a probe cannot answer, both because a backgrounded Studio window does not render
+(finding 0022):
+
+1. **Compass orientation.** The maths is verified; whether "up" on the binnacle's top face points at the bow
+   is a look-and-see. `COMPASS_SIGN` and `COMPASS_OFFSET_DEG` in `VesselClient` exist for that correction.
+2. **The damage-control prompt.** Present and configured (3 s hold, 10-stud range), but `Triggered` cannot be
+   fired from a script, so the repair path has never been exercised by a hold.
+
+Also unmeasured: readability of the compass at The Wall's brightness of 0.30. `LightInfluence = 0` should
+make it immune, and that is exactly the kind of "should" worth one screenshot.
 
 ## Still owed
 

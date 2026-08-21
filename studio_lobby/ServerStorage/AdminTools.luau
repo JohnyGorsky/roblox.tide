@@ -1079,6 +1079,37 @@ tools.vesselTeleport = {
 	Global scope, all of them: hull integrity is one shared thing and there is no per-player view of it.
 	`vesselDamageReport` is the exception - reading a number changes nothing for anyone else.
 ]]
+--[[
+	REBUILD. The tool job 022 discovered it owed.
+
+	Once the vessel is LOST it stays lost, on purpose: `step` bails out early and `recoverIfLost` is
+	deliberately blocked so a sunk hull is not quietly replaced with a fresh one (that would make the
+	consequence decision 0014 exists to create free). Correct for the game, and it meant that testing a loss
+	ended the session - the first survival test run had no way back except restarting Play.
+
+	`_G.TideVessel.rebuild` has existed since job 021 and was exposed nowhere. This exposes it, and clears
+	the expedition flags with it, because a fresh hull under an `ExpeditionOver` banner is a confusing
+	half-state that nothing else would ever produce.
+]]
+tools.vesselRebuild = {
+	id = "vesselRebuild",
+	label = "Rebuild the vessel",
+	section = "Vessel",
+	scope = "global",
+	controls = { kind = "button", output = "text" },
+	run = function(_player: Player, _args: any)
+		local V = vessel()
+		if not V then return false, "no vessel - is the game in Play?" end
+		local wasLost = V.state.lost == true
+		workspace:SetAttribute("ExpeditionOver", nil)
+		workspace:SetAttribute("ExpeditionOverReason", nil)
+		V.rebuild()
+		return true, ("rebuilt at the spawn point, sound and fuelled%s.\n\nEveryone's ReplicationFocus is "
+			.. "repointed at the new hull; use 'Put me on the boat' to get aboard.")
+			:format(wasLost and " (she had been LOST)" or "")
+	end,
+}
+
 tools.vesselDamageReport = {
 	id = "vesselDamageReport",
 	label = "Damage report",

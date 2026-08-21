@@ -25,7 +25,9 @@ Hard constraints:
 
 - [x] Requirements reviewed (this intake)
 - [x] Implementation plan created & agreed
-- [x] Implementation written — analyzer-clean, arithmetic checked, **not yet run** (Studio Sync was down
-      for the whole job, finding 0007)
-- [ ] Verified in a session — `Storm → Survival test`, both modes. This is what the job is answerable to
-- [ ] Final summary + changelog written (held until it has ticked)
+- [x] Implementation written — analyzer-clean in both places
+- [x] Verified in a session 2026-08-21 — survival 45.5 s vs 45 declared, escape 27.9 s with 74% of the hull,
+      distance-gain 99.2% of theory, buoyancy converges under full flooding
+- [ ] Four hands-on items remain — compass orientation and readability, the damage-control hold, and a
+      human-steered approach (see final-summary.md)
+- [x] Final summary + changelog written

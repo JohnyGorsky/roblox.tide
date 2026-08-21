@@ -38,7 +38,26 @@ local ATTR_DISTANCE = "StormDistance" -- studs astern
 local ATTR_INTENSITY = "StormIntensity" -- 0..4
 local ATTR_WIND = "StormWind" -- 0..1, the master sensory control
 local ATTR_SHELTERED = "StormSheltered" -- bool
-local ATTR_LAST_POS = "StormLastVesselZ" -- for measuring northward progress
+--[[
+	🔴 THE LAST VESSEL POSITION IS NOT AN ATTRIBUTE. Job 022, and it was one until validation caught it.
+
+	It used to live on `StormLastVesselZ`, alongside the attributes above - and Workspace attributes replicate,
+	so every client could read the hull's northward coordinate. A client watching that number RISE knows it is
+	heading north, which is precisely the free heading oracle decision 0014 forbids inside The Wall. It is the
+	same leak `VesselHeading` was removed for, arriving through the storm's own bookkeeping.
+
+	It was harmless until job 022 by accident: `vesselZ` never resolved (finding 0020), so this was written
+	once as 0 by `reset` and never updated. Fixing the storm published the vessel's position as a side effect,
+	which is a good argument for reading a client's attribute list after any change to what the server writes.
+
+	An upvalue is also simply CORRECT here. The attributes above are shared because clients read them and must
+	agree with the server about where the storm is. Nothing outside `advance` has ever read this one, and only
+	the server calls `advance` - so there is no second reader to keep in sync.
+
+	`nil` means "no measurement yet", which is what makes the first tick after a reset measure zero travel
+	rather than crediting the hull's whole Z coordinate. See `reset`.
+]]
+local lastVesselZ: number? = nil
 
 --[[
 	THE TWO NUMBERS THAT DECIDE THE GAME (decision 0019).
@@ -204,16 +223,23 @@ function StormFront.reset(distance: number?)
 		🔴 CLEAR the last position, do not zero it. Job 022, and it is a one-word difference that hands out
 		free distance.
 
-		`advance` reads `local last = num(ATTR_LAST_POS, vesselZ)` - so an ABSENT attribute falls back to the
-		vessel's current Z and the first tick correctly measures zero travel. Writing 0 instead makes the
-		first tick believe the vessel travelled its entire Z coordinate in one step: a hull 500 studs north
-		would be handed 500 x 1.6 = 800 studs of free cushion by the act of resetting the storm.
+		`advance` treats a nil `lastVesselZ` as "no measurement yet" and seeds it from the vessel's current Z,
+		so the first tick correctly measures zero travel. Setting 0 instead makes that tick believe the vessel
+		travelled its entire Z coordinate in one step: a hull 500 studs north would be handed
+		500 x 1.6 = 800 studs of free cushion by the mere act of resetting the storm.
 
-		Latent until job 022. `vesselZ` never returned anything before it was fixed (finding 0020), so
-		`ATTR_LAST_POS` was written and never read. The moment the fix landed, every `reset` mid-run - which is
+		Latent until job 022. `vesselZ` never returned anything before it was fixed (finding 0020), so the old
+		attribute was written and never read. The moment the fix landed, every `reset` mid-run - which is
 		exactly what the admin panel's storm-distance tool does - became a distance cheat.
 	]]
-	workspace:SetAttribute(ATTR_LAST_POS, nil)
+	lastVesselZ = nil
+	--[[
+		Clear the retired attribute too, in case a session or a saved place still carries it. Cheap, and it
+		stops a stale copy of the vessel's position sitting on the wire for a client to find.
+	]]
+	if workspace:GetAttribute("StormLastVesselZ") ~= nil then
+		workspace:SetAttribute("StormLastVesselZ", nil)
+	end
 	StormFront.apply()
 end
 
@@ -230,13 +256,12 @@ function StormFront.advance(dt: number, vesselZ: number?)
 	distance -= rate * dt
 
 	if vesselZ then
-		local last = num(ATTR_LAST_POS, vesselZ)
-		local travelledNorth = vesselZ - last
+		local travelledNorth = vesselZ - (lastVesselZ or vesselZ)
 		if travelledNorth > 0 then
 			-- only northward progress counts; running back south does not hand distance to the storm twice
 			distance += travelledNorth * StormFront.GAIN_PER_STUD
 		end
-		workspace:SetAttribute(ATTR_LAST_POS, vesselZ)
+		lastVesselZ = vesselZ
 	end
 
 	-- Never let it run away past the start, or an early lead becomes an un-loseable one

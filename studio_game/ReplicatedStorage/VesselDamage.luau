@@ -82,9 +82,19 @@ VesselDamage.INTEGRITY_PER_MASS = 0.25
 	to end the run, with the tuned one usually losing. Flooding makes her wallow and take water over the
 	deck; INTEGRITY is what decides whether she is lost, and it is the only thing that does.
 
-	0.35 was chosen against the equilibrium: losing 35% of lift settles the hull roughly 0.6 studs deeper at
-	this draft, which halves the 3-stud freeboard's margin in a Storm-state sea without submerging the deck in
-	a calm one.
+	MEASURED at 100% flooding (job 022 validation), against a full-lift resting Y of 0.70:
+
+	    Light Swell   floats at  0.39   ->  0.31 studs lower
+	    Storm         floats at -0.45   ->  1.15 studs lower, riding a 4.2-stud bob
+
+	So in a calm sea she is visibly down but dry, and in a Storm sea she is a third of her freeboard lower
+	with green water coming aboard - which is the intended shape, and it is not what I estimated when writing
+	this (0.6 studs, sea unspecified). The equilibrium argument gives ~1.0 studs; the real figure depends on
+	the sea, because the float points spend part of each wave out of the water where there is no lift to lose.
+
+	Verified in the same session that the spring still CONVERGES at this setting: 62 seconds at full flooding
+	in a Storm sea gave amplitude 4.28 -> 4.27 across five windows (growth 0.999) with the mean holding, so
+	removing 35% of the lift does not cost the damping its authority.
 ]]
 VesselDamage.MAX_FLOODING_LIFT_LOSS = 0.35
 

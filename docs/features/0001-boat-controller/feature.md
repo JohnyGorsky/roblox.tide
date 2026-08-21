@@ -28,6 +28,10 @@ Implement the smallest production-worthy version of this system while preserving
 - [x] A self-lit compass at the helm — a `SurfaceGui` binnacle on the console, required by decision 0014 so
       The Wall is a navigation problem rather than a guess. Never a HUD readout, and nothing may ever fault it
 - [ ] Studio multiplayer verification — **still open**: driven and measured single-player only
+- [ ] Hand-driven verification — **still open**, and newly understood: the helm loop is on `RenderStepped`,
+      which does not fire while the Studio window sits unfocused (finding 0022), so every measurement so far
+      has gone through the `VesselTestDrive` hook rather than the client. That hook is more load-bearing than
+      it looks
 
 ## Verification rule
 

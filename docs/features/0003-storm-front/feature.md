@@ -59,16 +59,24 @@ the sea at range, and the audio bed does not loop audibly. Everything sensory is
 ladder, floods her, can capsize her and can lose the vessel — and lightning's fault rolls, which had been
 published and ignored since job 018, are finally consumed. Decision 0023 records the model.
 
-It is still **not** VERIFIED, for a different reason than before: **none of it has ticked.** Studio Sync was
-down for the whole of job 022 (finding 0007), so the damage model is analyzer-clean and its arithmetic is
-checked against the storm's own constants, but no line of it has run. The one thing that would settle it is
-`Storm -> Survival test`, which measures both halves of decision 0014's claim — that staying is fatal on a
-known clock, and that leaving works if you leave now.
+**Measured in a session on 2026-08-21**, and both halves of decision 0014's claim hold:
 
-Second open item: the storm's forward pressure had **never actually worked**. `WorldTick.vesselZ()` looked for
-an instance path that never existed, so `GAIN_PER_STUD` was never applied and distance could only decrease —
-outrunning the front was not hard, it was impossible (finding 0020). Fixed in job 022, and it needs the same
-session to confirm.
+| Check | Result |
+|---|---|
+| Hold position at full exposure | lost at **45.5 s** against 45 declared (101%) |
+| Escape run from distance 0 | cleared the front at **27.9 s** with 74% of the hull left |
+| Fault ladder | fires at exactly 20 / 40 / 60 / 75% integrity lost |
+| Northward travel buys distance | **+12.84 studs/s** measured against +12.94 theory (99.2%) |
+
+The storm's forward pressure had also **never actually worked**: `WorldTick.vesselZ()` looked for an instance
+path that never existed, so `GAIN_PER_STUD` was never applied and distance could only decrease — outrunning
+the front was not hard, it was impossible (finding 0020). Fixed and measured in the same session.
+
+Still **not** VERIFIED, and the remaining gap is specific: nothing has been driven by a HUMAN at the helm.
+The escape was measured through the `VesselTestDrive` attribute hook, because a backgrounded Studio window
+does not render and so the client's RenderStepped helm loop never runs (finding 0022). What is unproven is
+therefore the *experience*: a full five-minute approach, felt from the deck, with a person steering by the
+compass. That is a hands-on run, not a probe.
 
 ## Still open
 

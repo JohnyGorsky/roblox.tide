@@ -143,7 +143,7 @@ that exist in Studio but were never registered.
 - [x] **019** Living-world audio: ambience mixer, ocean beds, storm bed
 - [x] **020** Admin panel: collapsible sections, client-side tools, time-of-day and audio solo
 - [x] **021** Vessel foundation: chassis, socket kit, buoyancy, helm and fuel
-- [ ] **022** The storm's teeth: hull damage and system faults inside The Wall
+- [x] **022** The storm's teeth: hull damage and system faults inside The Wall
 
 An unchecked job is still in flight.
 

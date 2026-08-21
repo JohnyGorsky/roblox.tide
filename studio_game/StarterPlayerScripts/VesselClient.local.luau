@@ -279,7 +279,25 @@ for _, instance in ipairs(CollectionService:GetTagged(COMPASS_TAG)) do
 end
 CollectionService:GetInstanceAddedSignal(COMPASS_TAG):Connect(trackCompass)
 
-RunService.RenderStepped:Connect(function()
+--[[
+	🔴 HEARTBEAT, NOT RenderStepped. Measured, not preference (job 022).
+
+	A backgrounded Studio Play session SIMULATES but does not RENDER: measured in the running client,
+	Heartbeat and Stepped both fired 120 times in 2 seconds while RenderStepped fired ZERO. So anything on
+	RenderStepped is not merely slow to test over MCP - it does not execute at all, and the symptom is an
+	effect that looks broken with no error anywhere. That is finding 0012 generalising from the Edit context
+	to any unfocused Play session.
+
+	This loop rotates a GUI frame. It has no need of render timing - it is not writing a camera transform
+	that a camera script would overwrite the same frame - so Heartbeat costs nothing and buys the ability to
+	verify the compass at all. Finding 0012 states the general rule: prefer Heartbeat for anything that does
+	not strictly need render timing, because it is the half that stays testable, and a channel that cannot be
+	checked is a channel that quietly rots.
+
+	⚠️ The HELM loop above is still on RenderStepped and has the same blind spot - see finding 0022. Left
+	alone deliberately: it was signed off by feel in job 021 and changing input timing is not this job's call.
+]]
+RunService.Heartbeat:Connect(function()
 	if #compassCards == 0 then
 		return
 	end
