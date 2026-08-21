@@ -36,6 +36,7 @@ local WaveField = require(ReplicatedStorage:WaitForChild("WaveField"))
 local SeaStates = require(ReplicatedStorage:WaitForChild("SeaStates"))
 local VesselDamage = require(ReplicatedStorage:WaitForChild("VesselDamage"))
 local StormFront = require(ReplicatedStorage:WaitForChild("StormFront"))
+local Expedition = require(ReplicatedStorage:WaitForChild("Expedition"))
 
 local SPEC_ID = "StarterLaunch"
 
@@ -260,7 +261,16 @@ local function loseVessel(reason: string)
 	if state.rudder then state.rudder.Torque = Vector3.zero end
 	if state.heel then state.heel.Torque = Vector3.zero end
 	workspace:SetAttribute("VesselDriver", "")
-	workspace:SetAttribute("ExpeditionOver", true)
+	--[[
+		🔴 `ExpeditionOver` IS NOT SET HERE ANY MORE (job 023).
+
+		Job 022 set it directly, as an admitted placeholder for an expedition flow that did not exist. It
+		exists now: `ExpeditionServer` watches `VesselLost` and decides that the RUN is over, which is a
+		different statement from *the vessel is lost*. Two writers for one flag is how a run ends twice.
+
+		The reason string stays, because it carries detail only this file knows - notably whether she
+		capsized, which is how the run's cause is told apart from a plain hull failure.
+	]]
 	workspace:SetAttribute("ExpeditionOverReason", reason)
 	local faults = {}
 	for id, on in pairs(state.faults) do
@@ -270,7 +280,7 @@ local function loseVessel(reason: string)
 	end
 	table.sort(faults)
 	warn(("[VESSEL] 🔴 VESSEL LOST - %s. distance %.0f, flooding %.0f%%, faults: %s. "
-		.. "(Placeholder outcome: no expedition-end flow exists yet - todo 0006.)")
+		.. "(ExpeditionServer resolves the run; the teleport home is still Planned 0002.)")
 		:format(reason, StormFront.distance(), state.flooding * 100,
 			#faults > 0 and table.concat(faults, ", ") or "none"))
 	publish()
@@ -797,6 +807,21 @@ local function buildVessel()
 		prompt.ActionText = "Release the helm"
 		workspace:SetAttribute("VesselDriver", player.Name)
 		print(("[VESSEL] %s took the helm"):format(player.Name))
+		--[[
+			🔴 THIS IS WHERE THE STORM'S CLOCK STARTS (decision 0024, job 023).
+
+			The run opens with the front stationary and five minutes to get aboard. Taking the helm ends the
+			grace - and it is ONE-WAY: releasing the helm below does not clear it, and nothing else may.
+			Clearing it would turn the grace into a switch that stops the game's only pressure, so a crew
+			could park, stand up, and loot in perfect safety forever.
+
+			Raised here rather than in `ExpeditionServer` because this is the moment itself, and the flag has
+			exactly one writer.
+		]]
+		if workspace:GetAttribute(Expedition.ATTR.runStarted) ~= true then
+			workspace:SetAttribute(Expedition.ATTR.runStarted, true)
+			print("[VESSEL] the run has begun - the storm is moving")
+		end
 	end)
 
 	--[[

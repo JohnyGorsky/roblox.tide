@@ -213,9 +213,18 @@ end
 	Outside the filled water the honest answer is "flat, at sea level" - never nan, never an extrapolated
 	crest, because callers use this to decide where to float things.
 ]]
+--[[
+	Delegated to `SeaStates.insideOcean` in job 023, when the ocean stopped being a square (decision 0025).
+
+	This used to test `abs(z) <= half` against the EAST-WEST half-extent, which would have reported every
+	position north of 3072 as outside the ocean - so `HeightAt` would return flat water for the whole
+	northern half of the voyage and the hull would stop floating on waves, with no error anywhere.
+
+	One owner for the patch's shape, so the wave field and the fog rule can never disagree about where
+	the water ends.
+]]
 local function insideOcean(x: number, z: number): boolean
-	local half = SeaStates.OCEAN_HALF_EXTENT
-	return math.abs(x) <= half and math.abs(z) <= half
+	return SeaStates.insideOcean(x, z)
 end
 
 --[[

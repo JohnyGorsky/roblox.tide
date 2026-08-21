@@ -816,6 +816,115 @@ end
 	travel, so at scale 10 the crew loses ground ten times faster than they should and every number this
 	prints would be wrong in a direction that looks like a damage bug.
 ]]
+--[[
+	EXPEDITION. Server-side, because `_G.TideExpedition` only exists there (finding 0017's trap).
+
+	The loop is not judgeable by eye any more than the damage curve was - whether a run ended for the
+	right reason is a question about a state machine, so these drive it directly rather than asking
+	someone to
+	sail for two and a half minutes to find out.
+]]
+local function expedition()
+	return (_G :: any).TideExpedition
+end
+
+tools.expeditionReport = {
+	id = "expeditionReport",
+	label = "Run status",
+	section = "Expedition",
+	scope = "local",
+	controls = { kind = "button", output = "text" },
+	run = function(_player: Player, _args: any)
+		local E = expedition()
+		if not E then return false, "no expedition - is the game in Play?" end
+		return true, E.report()
+	end,
+}
+
+tools.expeditionTarget = {
+	id = "expeditionTarget",
+	label = "Northing target",
+	section = "Expedition",
+	scope = "global",
+	controls = { kind = "choice", options = { "300 (quick test)", "1200", "2400 (default)", "5000" } },
+	run = function(_player: Player, args: any)
+		local E = expedition()
+		if not E then return false, "no expedition - is the game in Play?" end
+		local map = { ["300 (quick test)"] = 300, ["1200"] = 1200, ["2400 (default)"] = 2400, ["5000"] = 5000 }
+		local target = map[tostring(args and args.value)]
+		if not target then return false, "unknown target" end
+		local ok, msg = E.setTarget(target)
+		--[[
+			The corridor check is reported whether it passes or fails, because the failure is invisible in
+			game: claim more northing than there is water and the crew sails to a spot where `HeightAt`
+			returns a flat plane. See SeaStates.OCEAN_EXTENT_Z.
+		]]
+		return true, ("target %d studs.\n\n%s%s"):format(target, ok and "" or "🔴 ", msg)
+	end,
+}
+
+tools.expeditionStart = {
+	id = "expeditionStart",
+	label = "Start the storm now",
+	section = "Expedition",
+	scope = "global",
+	controls = { kind = "button", output = "text" },
+	run = function(_player: Player, _args: any)
+		local E = expedition()
+		if not E then return false, "no expedition - is the game in Play?" end
+		if workspace:GetAttribute("RunStarted") == true then
+			return true, "already running - the grace is one-way and cannot be re-armed mid-run"
+		end
+		E.startNow()
+		return true, "the storm is moving. (Taking the helm does this by itself; this just skips the walk.)"
+	end,
+}
+
+tools.expeditionForce = {
+	id = "expeditionForce",
+	label = "Force an ending",
+	section = "Expedition",
+	scope = "global",
+	controls = {
+		kind = "choice",
+		options = { "finished (northing)", "lost (integrity)", "lost (capsize)", "lost (out of fuel)", "abandoned" },
+	},
+	run = function(_player: Player, args: any)
+		local E = expedition()
+		if not E then return false, "no expedition - is the game in Play?" end
+		local map = {
+			["finished (northing)"] = { "Finished", "northing" },
+			["lost (integrity)"] = { "Lost", "integrity" },
+			["lost (capsize)"] = { "Lost", "capsize" },
+			["lost (out of fuel)"] = { "Lost", "fuel" },
+			["abandoned"] = { "Lost", "abandoned" },
+		}
+		local pick = map[tostring(args and args.value)]
+		if not pick then return false, "unknown ending" end
+		E.force(pick[1], pick[2])
+		return true, ("forced %s / %s.\n\n%s"):format(pick[1], pick[2], E.report())
+	end,
+}
+
+tools.expeditionReset = {
+	id = "expeditionReset",
+	label = "Reset to boarding",
+	section = "Expedition",
+	scope = "global",
+	controls = { kind = "button", output = "text" },
+	run = function(_player: Player, _args: any)
+		local E = expedition()
+		if not E then return false, "no expedition - is the game in Play?" end
+		E.reset()
+		--[[
+			This is the ONE path allowed to lower `RunStarted` and hand the grace back. It is deliberately not
+			reachable during a run from anywhere else - see the note in ExpeditionServer.
+		]]
+		return true, "back to boarding: the front is parked again and the grace is restored.\n\n"
+			.. "The vessel is NOT rebuilt - use Vessel -> Rebuild the vessel if she was lost."
+	end,
+}
+
 tools.stormSurvivalTest = {
 	id = "stormSurvivalTest",
 	label = "Survival test (measured)",
@@ -1586,7 +1695,7 @@ function AdminTools.manifest(): { any }
 		A section not listed here falls to the end alphabetically, so adding one never breaks the sort - it
 		just does not get a considered position until someone gives it one.
 	]]
-	local SECTION_ORDER = { Vessel = 1, Storm = 2, Weather = 3, Sea = 4, Audio = 5, Diagnostics = 6 }
+	local SECTION_ORDER = { Expedition = 1, Vessel = 2, Storm = 3, Weather = 4, Sea = 5, Audio = 6, Diagnostics = 7 }
 	table.sort(list, function(a, b)
 		if a.section == b.section then
 			return a.label < b.label

@@ -24,6 +24,7 @@ local RunService = game:GetService("RunService")
 local DayNight = require(ReplicatedStorage:WaitForChild("DayNight"))
 local StormFront = require(ReplicatedStorage:WaitForChild("StormFront"))
 local LocalWeather = require(ReplicatedStorage:WaitForChild("LocalWeather"))
+local Expedition = require(ReplicatedStorage:WaitForChild("Expedition"))
 
 --[[
 	1 Hz.
@@ -152,10 +153,38 @@ RunService.Heartbeat:Connect(function(dt)
 	local step = accumulated
 	accumulated = 0
 
-	-- order is load-bearing at every step: see the header
-	local okStorm, stormErr = pcall(StormFront.advance, step * timeScale(), vesselZ())
-	if not okStorm then
-		warn("[WORLD] storm advance failed: " .. tostring(stormErr))
+	--[[
+		order is load-bearing at every step: see the header
+
+		🔴 THE STORM IS ON A LEASH UNTIL THE CREW BOARDS (decision 0024, job 023).
+
+		The run opens ashore with the front visible and STATIONARY - five minutes to look at it, get aboard
+		and decide something. Taking the helm starts its clock, once, and nothing stops it again.
+
+		`apply()` still runs below via the composer, so the front is still DRAWN at its start distance the
+		whole time: intensity, wind and the cloud wall are all live. It is only `advance` that waits.
+
+		Note this is also exactly what the lobby needs (Planned 0002): a storm on the horizon that never
+		arrives is this same gate, held permanently off. One mechanism, two settings - which is better than
+		the "pin the distance" approach that was originally planned for the lobby.
+	]]
+	local runStarted = workspace:GetAttribute(Expedition.ATTR.runStarted) == true
+	local over = workspace:GetAttribute(Expedition.ATTR.over) == true
+	if Expedition.stormShouldAdvance(runStarted, over) then
+		local okStorm, stormErr = pcall(StormFront.advance, step * timeScale(), vesselZ())
+		if not okStorm then
+			warn("[WORLD] storm advance failed: " .. tostring(stormErr))
+		end
+	else
+		--[[
+			Still publish intensity and wind from the parked distance, or the sea state, the sky and every
+			sensory channel would sit at whatever they were last set to - the front would be invisible during
+			the grace, which is the opposite of the intent.
+		]]
+		local okApply, applyErr = pcall(StormFront.apply)
+		if not okApply then
+			warn("[WORLD] storm apply failed: " .. tostring(applyErr))
+		end
 	end
 
 	local okWeather, weatherErr = pcall(LocalWeather.step)

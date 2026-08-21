@@ -331,6 +331,74 @@ SeaStates.WATER_Y = 0
 ]]
 SeaStates.OCEAN_HALF_EXTENT = 3072
 
+--[[
+	THE OCEAN IS A CORRIDOR, NOT A SQUARE (decision 0025, job 023).
+
+	`OCEAN_HALF_EXTENT` above is retained and still means exactly what every fog check needs: the distance to
+	the NEAREST edge, which is east-west and does not change as the corridor grows north. That is why
+	`validateFogWithinOcean` and `DayNight` can keep using it unchanged.
+
+	Northing is different. The voyage runs up the middle, so the Z extent has to hold the whole run:
+
+	    X:  +/- OCEAN_EXTENT_X          east-west, unchanged, and the fog constraint
+	    Z:  OCEAN_EXTENT_Z.min .. .max  the corridor the expedition travels along
+]]
+SeaStates.OCEAN_EXTENT_X = 3072
+
+--[[
+	The corridor's north-south span.
+
+	The southern margin is deliberate: the crew is being pushed south by the storm, so being swept backwards
+	must not mean being swept out of the world.
+
+	*** THE INVARIANT THAT SETS `max` ***
+
+	    max  >=  northing target  +  the largest fogEnd
+
+	Because a crew standing AT the finish and looking north must still see fog rather than the water stopping.
+	With the job-023 placeholder target of 2400 and Dead Calm's capped fogEnd of 2900, that is 5300 - hence
+	5500.
+
+	This is also where decision 0025's figure of 12000 comes from, which the decision itself did not spell
+	out: 12000 is a target of about 9100 plus the same 2900 of fog. So the corridor is grown WITH the target,
+	and the rule tells you by how much.
+
+	🔴 GROW THE TERRAIN AND THIS CONSTANT TOGETHER. If the constant claims water that is not
+	filled, `WaveField.HeightAt` computes waves over nothing: the hull stops floating on a sea and starts
+	floating on a flat plane, and it reads as the wave field breaking rather than as running out of world.
+
+	Filled incrementally rather than straight to 12000 on purpose: the full corridor is +145% terrain on a
+	mobile-first game, for a northing target nobody has tuned yet. +40% buys the placeholder run with the
+	invariant satisfied, and the rest lands when the target does.
+]]
+SeaStates.OCEAN_EXTENT_Z = { min = -1000, max = 5500 }
+
+--- Is a world XZ inside the filled ocean? The one place that knows the patch is a corridor.
+function SeaStates.insideOcean(x: number, z: number): boolean
+	return math.abs(x) <= SeaStates.OCEAN_EXTENT_X
+		and z >= SeaStates.OCEAN_EXTENT_Z.min
+		and z <= SeaStates.OCEAN_EXTENT_Z.max
+end
+
+--[[
+	Does the corridor hold a run of `target` studs of northing without the crew ever seeing its north end?
+	Returns the shortfall so a caller can say how much water to add rather than just failing.
+]]
+function SeaStates.validateCorridorForTarget(target: number): (boolean, string)
+	local worst = 0
+	for _, id in ipairs(SeaStates.Order) do
+		worst = math.max(worst, ((SeaStates :: any)[id] :: SeaState).sky.fogEnd)
+	end
+	local needed = target + worst
+	local have = SeaStates.OCEAN_EXTENT_Z.max
+	if have >= needed then
+		return true, ("corridor reaches Z=%d; a %d target with %d of fog needs %d - %d studs of margin")
+			:format(have, target, worst, needed, have - needed)
+	end
+	return false, ("corridor reaches only Z=%d; a %d target with %d of fog needs %d - fill %d more studs north")
+		:format(have, target, worst, needed, needed - have)
+end
+
 --- Every state's fogEnd must be inside the water. Call in a test; cheap enough to call on load.
 function SeaStates.validateFogWithinOcean(): (boolean, string)
 	local problems = {}

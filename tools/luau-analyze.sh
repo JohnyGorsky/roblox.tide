@@ -17,6 +17,7 @@
 #
 #     TypeError: Unknown require: game/ReplicatedStorage/SeaStates
 #     TypeError: Key 'Vessel' not found in external type 'ReplicatedStorage'
+#     TypeError: Unknown type 'Expedition.Cause'      <- exported types from an unresolved require
 #
 # Those resolve fine at runtime. Filter them, and compare what is left against the committed version
 # before assuming a diagnostic is yours:

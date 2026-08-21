@@ -2,7 +2,37 @@
 
 **Project**: `roblox.tide`
 **Created**: 2026-08-21
-**Status**: Planning (awaiting go-ahead)
+**Status**: In flight — steps 1–4 and 8 landed and measured; 6, 7, 9 remain
+
+## Progress (2026-08-21)
+
+| Step | State |
+|---|---|
+| 1. Grow the ocean into a corridor | ✅ Filled Z 3072→5500 in 18 tiles, 0.34 s. Water continuous through the old seam, ends exactly at 5500, edges at ±3072 |
+| 1b. Extent model | ✅ `OCEAN_EXTENT_X` / `OCEAN_EXTENT_Z`, `SeaStates.insideOcean` now the single owner, `WaveField` delegates to it. **Waves verified through Z=5400 and flat from 5600** — the change that could have silently stopped the hull floating halfway up the voyage |
+| 2. The boarding gate | ✅ All three claims measured: parked at 4200 during the grace (0.00 drift over 12 s), closing at −14.09 studs/s after boarding, and **still −14.05 after the helm is released** — the exploit is closed |
+| 3. `Expedition.luau` | ✅ Pure model: states, causes, northing, the summary shape |
+| 4. `ExpeditionServer` | ✅ Run resolved **Finished / northing at 2402 of 2400 in 144 s**, hull ending with 3,097 studs of water still ahead. `ExpeditionOver` now has one owner — that write moved out of job 022's `loseVessel` |
+| 5. Start island | ✅ Job 024 |
+| 8. Admin tools | ✅ 5 tools in a new **Expedition** section, ordered first. 49 tools total, scopes valid |
+| 6. Tender + fuel barrels | ⬜ **Remaining** — the one uncertain piece (a second vessel against `VesselServer`'s singleton `state`) |
+| 7. The in-place summary beat | ⬜ Remaining |
+| 9. Docs | ⬜ Remaining |
+
+### One deliberate deviation from decision 0025
+
+The corridor was filled to **Z=5500, not 12000**, and the reasoning is now a stated invariant rather than a
+judgement call:
+
+> `OCEAN_EXTENT_Z.max ≥ northing target + the largest fogEnd`
+
+With the placeholder target of 2400 and Dead Calm's capped fogEnd of 2900 that is 5300, hence 5500 with 200
+studs of margin. The full 12000 is +145% terrain on a mobile-first game for a target nobody has tuned;
+5500 is +40%.
+
+The invariant also **explains decision 0025's own figure**, which the decision did not spell out: 12000 is a
+target of about 9100 plus the same 2900 of fog. `SeaStates.validateCorridorForTarget` evaluates it, and the
+admin tool prints it whenever the target changes.
 
 The run — a corridor to voyage through, a storm on a leash, and three ways to end. Game place only; the lobby
 and departure wait in [Planned 0002](../../Planned/0002-lobby-place-and-departure.md) for the sculpted island.
