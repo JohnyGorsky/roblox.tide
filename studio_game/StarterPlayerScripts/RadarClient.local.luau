@@ -79,6 +79,21 @@ local ui: { [string]: any } = {}
 local blips: { [Instance]: Blip } = {}
 local previousAngle = 0
 local sweepIndex = 1
+--[[
+	🔴 AT MOST ONE CONTACT PING PER REVOLUTION.
+
+	The first version pinged per CONTACT on acquisition. With six contacts all unseen at startup the beam
+	reaches each at its own bearing, so one revolution produced six pings - and anything sitting near the edge
+	of range flickers between off and on and re-acquires repeatedly. Measured in play: about ten pings.
+
+	A ping is meant to mean *something new is out there*, once. Ten of them means nothing at all, and teaches
+	the operator to stop listening - the exact failure the ping was designed to avoid by not re-firing for
+	known contacts.
+
+	So it is capped to one per sweep, tracked by revolution index rather than by a timer: the index comes from
+	the same server clock the beam does, so the cap can never drift out of step with the sweep it is capping.
+]]
+local lastPingRevolution = -1
 
 -- ---------------------------------------------------------------------------
 -- Build the scope face
@@ -344,6 +359,33 @@ local function buildScope(surface: SurfaceGui)
 		ping.RollOffMaxDistance = 40
 		ping.Parent = host
 		ui.pingSound = ping
+
+		--[[
+			LIVE AUDITION, and it exists because the first attempt at choosing these sounds went wrong.
+
+			The candidates were judged through the storm's `thunder` slot, which plays at the volume of thunder
+			600 studs away - far too quiet and distant to hear what a clip actually IS. Two of the three chosen
+			that way turned out to be transmission-interference textures rather than pings, and it was only
+			obvious once they were playing at the station.
+
+			So a candidate can now be swapped in HERE, where it will actually live: positional, at the console,
+			at the real volume. `Radar -> Try a sound id` writes the attribute; this applies it.
+		]]
+		local function applyOverride()
+			local sweepId = workspace:GetAttribute("RadarSweepId")
+			if typeof(sweepId) == "string" and sweepId ~= "" and ui.sweepSounds then
+				for _, snd in ipairs(ui.sweepSounds) do
+					snd.SoundId = "rbxassetid://" .. sweepId
+				end
+			end
+			local contactId = workspace:GetAttribute("RadarContactId")
+			if typeof(contactId) == "string" and contactId ~= "" then
+				ping.SoundId = "rbxassetid://" .. contactId
+			end
+		end
+		applyOverride()
+		workspace:GetAttributeChangedSignal("RadarSweepId"):Connect(applyOverride)
+		workspace:GetAttributeChangedSignal("RadarContactId"):Connect(applyOverride)
 		--[[
 			Announce an empty slot rather than shipping a placeholder clip. A wrong sound is far harder to
 			notice than a missing one - the rule from the audio registry.
@@ -491,10 +533,19 @@ local function step()
 				-- did the beam pass it since the last frame?
 				if Radar.sweptSince(relative % 360, previousAngle, angle) then
 					blip.lastSwept = now
-					if not blip.seen and ui.pingSound and ui.pingSound.SoundId ~= "" then
-						ui.pingSound:Play() -- only for a contact that was not on the scope before
+					if not blip.seen then
+						--[[
+							`seen` is set whether or not we ping. Otherwise unpinged contacts stay "new" and
+							trickle out one ping per revolution for as many revolutions as there are contacts -
+							a slow drip instead of a burst, which is no better.
+						]]
+						local revolution = math.floor(now / Radar.SWEEP_PERIOD)
+						if revolution ~= lastPingRevolution and ui.pingSound and ui.pingSound.SoundId ~= "" then
+							ui.pingSound:Play()
+							lastPingRevolution = revolution
+						end
+						blip.seen = true
 					end
-					blip.seen = true
 				end
 
 				local brightness = Radar.blipBrightness(now - blip.lastSwept)

@@ -880,6 +880,47 @@ tools.radarBreak = {
 	end,
 }
 
+--[[
+	AUDITION A RADAR SOUND, at the station.
+
+	The storm's `thunder` slot was the wrong harness for this: it plays a candidate at the volume of thunder
+	600 studs away, which is far too quiet and distant to tell a ping from an interference texture. Two of the
+	three sounds chosen that way were "Transmission Breakup ... Stutter ... Interference" clips whose
+	description mentioned sonar - they read as random noise once they were actually at the console.
+
+	This plays a candidate where it will live: positional, on the radar, at the real volume.
+]]
+tools.radarTrySound = {
+	id = "radarTrySound",
+	label = "Try a sound id",
+	section = "Radar",
+	scope = "global",
+	controls = {
+		kind = "text",
+		placeholder = "sweep=ID or contact=ID  (e.g. sweep=94964245942654)",
+	},
+	run = function(_player: Player, args: any)
+		local raw = tostring(args and args.value or "")
+		local slot, id = raw:match("^%s*(%a+)%s*=%s*(%d+)%s*$")
+		if not slot then
+			return false, "expected  sweep=ID  or  contact=ID  - digits only after the ="
+		end
+		if slot == "sweep" then
+			--[[
+				Both sweep voices get the same id while auditioning. Alternation exists to defeat audible
+				repetition, and judging a clip is easier when it is the only thing playing.
+			]]
+			workspace:SetAttribute("RadarSweepId", id)
+			return true, ("sweep -> %s. It ticks once per revolution, so stand at the console and wait up to 4 s."):format(id)
+		elseif slot == "contact" then
+			workspace:SetAttribute("RadarContactId", id)
+			return true, ("contact -> %s. It only fires for a NEW contact, so it will not repeat for one already"
+				.. " on the scope - drive until something comes into range, or use Radar status to see what is out there."):format(id)
+		end
+		return false, "unknown slot - use sweep or contact"
+	end,
+}
+
 tools.expeditionReport = {
 	id = "expeditionReport",
 	label = "Run status",
