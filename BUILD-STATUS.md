@@ -148,6 +148,7 @@ that exist in Studio but were never registered.
 - [x] **022** The storm's teeth: hull damage and system faults inside The Wall
 - [ ] **023** The run — a corridor to voyage, a storm on a leash, and three ways to end
 - [x] **024** Sculpt and paint two islands: the lobby hub and the game start island
+- [ ] **025** The lobby's atmosphere: a harbour sky, a calm sea, and a storm that never arrives
 
 An unchecked job is still in flight.
 

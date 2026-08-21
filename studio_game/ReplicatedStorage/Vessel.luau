@@ -329,8 +329,82 @@ local STARTER_LAUNCH: Spec = {
 	},
 }
 
+--[[
+	THE TENDER. A fuel-free rowboat, and the crew's only way out of running dry (decision 0024).
+
+	Stranded at the storm's distance cap, the front is still 300 seconds away and there is nothing to do about
+	it. So a tender spawns alongside, burns no diesel, and the crew rows for one of the fuel barrels drifting
+	200-400 studs out. Being stranded costs TIME, not the run.
+
+	🔴 CRUISE MUST STAY UNDER THE BREAK-EVEN SPEED, WHICH IS 8.75.
+
+	    StormFront.ADVANCE_RATE / GAIN_PER_STUD  =  14 / 1.6  =  8.75 studs/s
+
+	Anything faster than that GAINS ground on the storm. A fuel-free boat above 8.75 would let a crew abandon
+	the launch and outrun the front forever, which makes the vessel - and the whole fuel economy it exists to
+	consume - pointless. 6 is a rowboat: it can fetch fuel and it can never escape.
+
+	There is a second guard that comes free, and it is worth not breaking: `StormFront` chases the VESSEL,
+	reading its Z through `_G.TideVessel`. So a crew that rows away and leaves the launch does not escape -
+	the front closes on the launch, destroys it, and the run ends. Abandoning the ship IS losing.
+
+	No fuel at all: `fuelCapacity` and `fuelBurn` are both zero, which is the spec stating the design rather
+	than a driver remembering to skip it.
+]]
+local TENDER: Spec = {
+	id = "Tender",
+	name = "Ship's Tender",
+	size = Vector3.new(6, 2.5, 12),
+	density = 1.2, -- > 1, per decision 0022: terrain water must not lift it toward a flat Y=0 plane
+	draft = 0.8,
+	--[[
+		Four corners like the launch, so it pitches and rolls with the wave rather than sitting on it like a
+		plank. On a 12-stud hull four is plenty - the count is part of the spec precisely so a longer hull can
+		ask for more.
+	]]
+	buoyancyPoints = {
+		Vector3.new(-2.2, -1.25, 4.5),
+		Vector3.new(2.2, -1.25, 4.5),
+		Vector3.new(-2.2, -1.25, -4.5),
+		Vector3.new(2.2, -1.25, -4.5),
+	},
+	--[[
+		Mass is 1.2 x (6 x 2.5 x 12) = 216, so 900 of thrust is about 4.2 studs/s^2 - it gets going quickly
+		and then drag settles it at `cruise`, which is the number that actually matters.
+	]]
+	thrust = 900,
+	cruise = 6,
+	turnRate = 0.55, -- nimble; a small boat turns inside its own length
+	rudderLag = 0.4,
+	lateralGrip = 0.4,
+	--[[
+		Heel and trim are declared but NOT applied by the tender's driver, deliberately. Every torque in
+		`VesselServer` had to be re-aimed into world space after finding 0019 (a body-relative torque leaks
+		into every axis the body rotates about, which spun the launch 178 degrees in 8 seconds). A rowboat
+		does not need either effect, so the tender simply has no heel or trim torque and the entire failure
+		class is absent rather than guarded against.
+	]]
+	heelInDeg = 3.0,
+	heelOutDeg = 4.0,
+	rightingTorque = 8000,
+	planingTrimDeg = 0.5,
+	inertialTrimDeg = 1.0,
+	fuelCapacity = 0,
+	fuelBurn = 0,
+	--[[
+		Declared for type completeness and NOT wired in job 023: storm damage lives in `VesselServer`'s loop,
+		and the tender has its own minimal driver. A rowboat inside The Wall should certainly die; see the
+		todo. Low, because when it is wired it should be lethal.
+	]]
+	survivability = 12,
+	sockets = {
+		oars = { kind = "station", offset = Vector3.new(0, 1.25, -2) },
+	},
+}
+
 Vessel.Specs = {
 	StarterLaunch = STARTER_LAUNCH,
+	Tender = TENDER,
 }
 
 function Vessel.spec(id: string): Spec?

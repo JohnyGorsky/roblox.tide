@@ -4,7 +4,11 @@
 **Group**: [08 — Lobby & shipyard](../docs/build/08-lobby-shipyard.md)
 **Raised**: 2026-08-21, by the user — *"same endless sea, small island, storm in distance that never arrives,
 and then pads for parties, like in jungle game"*
-**Status**: ▶ **Unblocked 2026-08-21.** The island exists — the user asked Claude to sculpt it
+**Status**: ◐ **Partly promoted.** The lobby's *atmosphere* became [job 025](../Jobs/025/intake.md) on
+2026-08-21 (sea, sky, cloud wall, lightning, audio, and the static horizon storm — all measured). What is
+left here is **departure**: the party pads, the reserved-server teleport, the return, and the summary panel.
+
+The island exists — the user asked Claude to sculpt it
 (*"no you sculpt island, i think you can do it"*) and [job 024](../Jobs/024/intake.md) built it: 600 studs
 across, a flat plateau at Y=+14 and 350 studs across, painted, with the dock re-sited as a jetty. Ready to
 promote.
