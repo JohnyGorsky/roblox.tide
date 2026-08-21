@@ -24,3 +24,4 @@
 - [0022 — Vessel physics: dense hull, server authority, four-point buoyancy](0022-vessel-physics-and-authority.md)
 - [0023 — How the storm damages: one pool, a designed fault ladder, two failure states](0023-storm-damage-model.md)
 - [0024 — The expedition's shape: ~50 minutes, tiered stops, and a storm that is never in a hurry](0024-expedition-shape-and-pacing.md)
+- [0025 — The ocean is a corridor grown north, not a bigger square](0025-ocean-is-a-corridor.md)

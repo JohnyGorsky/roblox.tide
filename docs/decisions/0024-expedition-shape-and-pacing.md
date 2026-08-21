@@ -79,9 +79,13 @@ Eighteen minutes of travelling at cruise 18 is **19,800 studs — 3.2× the full
 (6144). A fifty-minute voyage cannot happen inside a 6144-stud box, so the endless sea has to become real:
 either decision [0002](0002-horizontal-world-wrap.md)'s east–west wrap, or recentring the world on the vessel.
 
-[Finding 0018](../../findings/0018-a-crew-can-reach-the-edge-of-the-bounded.md) has been sitting at "high"
-and undecided since 2026-08-20. It now gates the whole design, and no amount of island content will help
-until it is answered. **This is the thing to decide next.**
+[Finding 0018](../../findings/0018-a-crew-can-reach-the-edge-of-the-bounded.md) had been sitting at "high"
+and undecided since 2026-08-20, and this promoted it to a blocker.
+
+**Answered the same day by decision [0025](0025-ocean-is-a-corridor.md):** grow the ocean north into a
+corridor (X unchanged at ±3,072, Z from −1,000 to +12,000), which costs 2.1× the water and — because the
+nearest edge is still east–west — costs nothing in fog or draw distance. Decision 0002's wrap remains the
+answer for width.
 
 ### 🔴 Fuel is the spine, and now it has a number
 
@@ -108,6 +112,55 @@ a crew with six tanks' worth of range reaches the edge of the world several time
   bite for the first time.
 - Nothing here changes decision 0014's damage model or job 022's measured curve. A crew caught at a stop
   still dies in 45 seconds of full exposure.
+
+## Being stranded: a tender and floating fuel, not a give-up button
+
+**Added 2026-08-21, replacing a proposed "abandon ship" action.**
+
+Running dry at the distance cap means the front is still 300 seconds away, and the crew can do nothing about
+it — up to five and three-quarter minutes of watching. The first proposal was a button to end the run. The
+better answer, and the one taken:
+
+- a **small wooden tender** spawns alongside the ship. It **burns no diesel**, so a stranded crew can always
+  launch it
+- **fuel barrels drift on the water** at a distance — visible, reachable, and a round trip away
+- the crew may also just **swim** for it
+
+So being stranded costs **time**, not the run. That is the design brief exactly: give them a chance, make them
+pay for it. And it converts the game's only dead interval into its own small emergency, which is the same
+instinct as decision 0014's "damage should create tasks, not only subtract health".
+
+### The cost, in the storm's own currency
+
+Adrift, the front closes at 14 studs/s against a 4,200 cushion. A tender at ~6 studs/s:
+
+| Barrel at | Round trip | Cushion spent |
+|---|---|---|
+| 200 studs | 67 s | 22% |
+| 300 studs | 100 s | 33% |
+| 400 studs | 133 s | 44% |
+
+So **200–400 studs is the useful band** — expensive enough to hurt, survivable enough to be worth trying. It
+also gives group 03 a placement rule rather than a vibe.
+
+### 🔴 The tender must stay slower than the break-even speed
+
+Break-even is `ADVANCE_RATE / GAIN_PER_STUD` = **8.75 studs/s**. Anything faster than that gains ground on the
+storm. A fuel-free boat above 8.75 would mean a crew could abandon the launch and outrun the front *forever*,
+which makes the entire vessel — and the fuel economy it exists to consume — pointless.
+
+**So the tender is ~6 studs/s, and no future tender goes near 8.75.** It must feel like a rowboat, because
+mechanically that is precisely what it has to be.
+
+### The safety property that already exists
+
+There is a second guard, and it comes free from how the storm is already built: **`StormFront` chases the
+vessel**, reading its Z through `_G.TideVessel`. So a crew that takes the tender and leaves the ship behind
+does not escape — the front closes on the launch, destroys it, and job 022 ends the run. Abandoning the ship
+*is* losing.
+
+Worth stating because it is load-bearing and invisible: if a future job ever makes the storm chase the
+*players* instead of the vessel, this whole mechanic becomes an exploit.
 
 ## What is deliberately not decided here
 

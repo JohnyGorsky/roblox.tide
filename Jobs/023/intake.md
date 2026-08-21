@@ -1,92 +1,90 @@
-# Job #023: The expedition loop: departure, the run's three endings, and the return
+# Job #023: The run — a corridor to voyage, a storm on a leash, and three ways to end
 
 **Project**: `roblox.tide`
-**Created**: 2026-08-21 20:12:36
+**Created**: 2026-08-21
+**Re-scoped**: 2026-08-21 — see *Why this changed*
 **Status**: Requirements Gathering (intake)
+
+## Why this changed
+
+This started as "the expedition loop", covering both places. Two rulings then conflicted: split at A|B with
+**023 = the lobby**, and **wait for the sculpt** rather than graybox the island. The lobby half is exactly the
+half that needs the island, so 023 would have begun blocked.
+
+So the halves were swapped. **023 is the game-place half** — no art, no second player, measurable from a
+probe the way job 022 was. The lobby and departure wait in
+[Planned 0002](../../Planned/0002-lobby-place-and-departure.md) until the island is sculpted.
 
 ## Requirements / goal
 
-Close the loop. Today the game has a sea, a storm with teeth and a drivable vessel, but no way to START a run and no way to FINISH one - and job 022's vessel loss dead-ends: she sinks, ExpeditionOver is set, and nothing reads it. The two places exist with no route between them (decision 0013).
+Make a run into a run. After job 022 the game has a sea, a storm with teeth and a drivable vessel, but the
+storm starts the instant the server does, there is nowhere to voyage to, and vessel loss dead-ends — she sinks,
+`ExpeditionOver` is set, and nothing reads it.
 
-Scope:
-1. DEPARTURE, lobby side. A departure point the crew leaves from, party assembly, and a reserved-server teleport into the game place. Solo departure must work and must not feel like a penalty (group 08 section E).
-2. ARRIVAL, game side. Crew spawn aboard the vessel, the storm resets to its start distance, the run begins from a known state.
-3. THE RUN'S THREE ENDINGS, all of which must be real states rather than a stuck session:
-   - finished: the crew chooses to end the expedition and gets out
-   - vessel lost: job 022 already produces this (integrity zero, or capsize) and it currently goes nowhere
-   - out of fuel: adrift with the front still closing - a slow version of lost, and it needs a defined outcome rather than an indefinite wait
-4. RETURN. Teleport back to the lobby and show a run summary.
-5. TELEPORT FAILURE HANDLING. The manifest is explicit that this WILL fail sometimes: retries plus a graceful fallback, never a player stranded in a dead session.
-6. Close findings 0004 and 0005 as part of this: the game place is Fully Open with Social Slots on, which is exactly the wrong setting for a reserved-server expedition - a stranger could deep-link into a running run, or a friend could drop into a 6-slot crew mid-expedition.
+Scope, all in the **game place**:
+
+1. **Grow the ocean into a corridor** — decision 0025. X unchanged at ±3,072, Z from −1,000 to +12,000.
+   `OCEAN_HALF_EXTENT` becomes two extents. The Z extent must cover the whole voyage, because
+   `WaveField.HeightAt` returns flat water outside the patch and a hull that reaches the end stops floating on
+   waves at all.
+
+2. **The boarding grace** — decision 0024. The run opens on a small island with the front visible and
+   **stationary**; taking the helm starts its clock. The gate must be **server-owned and one-way**: a crew
+   leaving the helm must not be able to pause the storm.
+
+3. **Northing, and a placeholder finale.** Track net northing (`hull.Z − startZ`), and resolve the run as
+   finished when it passes a tunable target. It is a *placeholder* — decision 0024 ends the run by defeating a
+   vessel, and the boss slots in behind this same trigger later.
+
+4. **The three endings**, as real states rather than a stuck session:
+   - **finished** — northing reached
+   - **lost** — job 022 already produces this; it needs somewhere to go
+   - **out of fuel** — not a third path. Adrift, the front still closes, arrives, and integrity drains: it
+     terminates in `lost` on its own. What it needs is to be recorded as a **cause**, so the summary says
+     "ran out of fuel" rather than "hull destroyed"
+
+5. **Being stranded is survivable, at a price** — decision 0024. A small wooden **tender** that burns no
+   diesel, and **fuel barrels drifting** 200–400 studs out. The crew rows for fuel and pays in time.
+   🔴 The tender must stay **under 8.75 studs/s**, the storm's break-even speed, or a fuel-free boat outruns
+   the front forever and the whole vessel becomes pointless.
+
+6. **The in-place summary beat** — the game-place half of the split summary. She goes down, or you make your
+   northing, and the screen holds. The lobby breakdown belongs to Planned 0002.
+
+7. **Admin tools** to drive all of it: set northing, force each ending, start the storm early, run report.
 
 Hard constraints:
-- Server-authoritative throughout. A client may request a departure or an extraction; it never decides one.
-- Decision 0013 owns the two-place split; decision 0008 says run power resets and permanent progression unlocks options; decision 0011 says permanent progression is credited individually to EVERY eligible participant.
-- Do not break the storm's 5-minute arrival or job 022's measured damage curve. StormFront.reset on arrival must not hand out free distance (see the reset note in StormFront).
-- Consult the roblox-multiplayer skill before designing the teleport: reserved servers, party teleport, and what happens to a player who rejoins.
 
-Open questions to settle in the plan, not now:
-- Does this job include DataStore persistence, or is the summary display-only with persistence deferred? Nothing decision 0008 lists as permanent progression (blueprints, role mastery, discoveries, cosmetics) exists yet, so there may be nothing real to credit.
-- Where does the run summary happen: in the game place before teleporting back, or in the lobby after arriving? The manifest lists this as open (group 08).
-- What does 'the crew chooses to finish' actually look like in the fiction - a departure point they return to, a radio call, or a course north off the map edge? This one interacts with finding 0018, which is still undecided.
+- Server-authoritative. A client may request; it never decides.
+- Do not break the storm's 5-minute arrival or job 022's measured damage curve (survival 45.5 s, escape
+  27.9 s, distance-gain 99.2% of theory). Re-run the survival test after touching `StormFront`.
+- `StormFront.reset` must keep clearing the last position rather than zeroing it, or arrival hands out free
+  distance.
+- The distance cap `math.min(distance, START_DISTANCE)` stays. It is what makes the threat permanently five
+  minutes away instead of bankable.
+- Terrain is a **saved-place change**, and nothing in the MCP can inspect a saved `.rbxl`. Grow it, read the
+  voxels back, screenshot the horizon, save deliberately.
 
-Prerequisite: LOBBY STUDIO SYNC IS NOT DELIVERING. Its AdminTools is 12,234 bytes behind disk and missing every tool added in jobs 020 and 022. This job is half lobby-side, so sync must be reconnected before implementation starts.
+Out of scope, deliberately: DataStore persistence (nothing decision 0008 calls permanent progression exists
+yet), the lobby, departure, the return teleport, and the finale vessel itself.
+
+## What is grayboxed
+
+| Id | Stands in for | Place | Note |
+|---|---|---|---|
+| `GB-GAME-START-ISLAND` | `ASSET-START-ISLAND` | game | The island the run opens on. Graybox here — the *lobby* island is the one being sculpted |
+| `GB-TENDER` | `ASSET-BOAT-TENDER` | game | The fuel-free rescue boat. A box until it earns a model |
+| `GB-FUEL-BARREL` | `ASSET-FUEL-BARREL` | game | Drifting barrels. Group 03 already plans a real jerry can and barrel |
+| `GB-STARTER-LAUNCH` | `ASSET-BOAT-STARTER` | game | Already registered, job 022. Unchanged |
+
+`GB-GAME-DECK` should probably be **retired** here: its own registry note says to delete it once `GAME-0001`
+lands, which it has, and decision 0024 replaces its purpose with the start island. It is editor-placed
+geometry, so that deletion is the user's call.
 
 ## Checklist
 
-- [ ] Requirements reviewed (this intake)
+- [x] Requirements reviewed (this intake)
 - [ ] Implementation plan created & agreed
 - [ ] Implementation completed
+- [ ] Verified in a session
 - [ ] Final summary + changelog written
-
-## The lobby, as specified 2026-08-21
-
-The departure side is a **place, not a menu**:
-
-- the **same endless sea** as the game place
-- a **small island** to stand on
-- a **storm on the horizon that never arrives** — the threat visible from safety
-- **party pads**, like the Jungle game's
-- everything **graybox for now except the island**, which gets sculpted
-- **every object placed in the editor.** Scripts add the effects and the behaviour, never the geometry.
-
-### 🔴 The storm in the lobby must never advance
-
-This is the trap in the whole idea, and it is one line away from shipping wrong. Reusing `StormFront` gets a
-front that **closes at 14 studs/s** and eventually engulfs the harbour, because that is what the module is
-for. The lobby wants the *look* of the storm and none of its clock:
-
-- port the sea (`SeaStates`, `WaveField`) and the cloud wall / sky, and **pin** the distance
-- do **not** call `StormFront.advance`, and do not run the game's `WorldTick`
-- the lobby currently has an **empty `ReplicatedStorage`** on disk, so all of this is new there, and the
-  duplication needs a deliberate answer: Roblox has no cross-place `ReplicatedStorage`, so a shared module
-  gets copied into both sync roots and must stay byte-identical — the same arrangement `AdminTools` already
-  lives with, and the same way it can rot
-
-Also: the lobby's water is currently tuned as a sheltered bay (`WaveSize 0.06`, `FogEnd 1900`) against the
-open sea's `0.18`. An endless sea in the lobby changes that on purpose, so re-check it against the
-`OCEAN_HALF_EXTENT` fog rule rather than raising `FogEnd` alone.
-
-### Party pads: reuse the Jungle pattern, do not invent a second one
-
-`roblox.jungle.game/lobby/sync/ServerScriptService/LobbyServer.server.luau` already does this and is worth
-copying in shape:
-
-| | |
-|---|---|
-Discovery | pads are **editor-placed** and found at runtime by attribute `Station = "PartyPad"` |
-No count constant | Jungle deliberately deleted its `PAD_COUNT` — it was read by nothing and had drifted to a lie (3 vs the 4 pads actually placed). Add or remove a pad in the editor and no code changes |
-Occupancy | `MAX_PER_PAD = 6`, `PAD_RADIUS = 9` studs to count as standing on it |
-Runtime-attached | the floating pad sign (`BillboardGui`, `MaxDistance 40`) and the `ProximityPrompt` are built by script onto editor geometry — exactly the division of labour asked for here |
-Launch | party → countdown → `ReserveServerAsync` → `TeleportAsync` with **3 attempts, 1 s apart**, and the launch audio/VFX fire **before** the teleport call so the party hears it even when the teleport fails or you are in solo Studio Play |
-Teleport data | seed, party size and member UserIds passed via `TeleportOptions:SetTeleportData` |
-
-That last detail is the one to keep: Jungle fires the launch effect before the call precisely because the
-call is the part that fails. Crew size for Tide is 6 / 20 (confirmed job 004), so `MAX_PER_PAD` wants
-checking against that rather than copied.
-
-### What this means for graybox discipline
-
-The island is the only thing being sculpted, so **everything else on the lobby island is a registered
-graybox**, the same way `GB-STARTER-LAUNCH` now is. Pads especially: a grey square that nobody wrote down is
-how placeholder art ships by accident, and `tools/audit-graybox.luau` exists to catch it.

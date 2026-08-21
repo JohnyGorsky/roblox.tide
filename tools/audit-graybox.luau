@@ -46,6 +46,12 @@ local REGISTERED: { [string]: { represents: string, place: string, path: string,
 		What must SURVIVE the restyle is in assets/registry/assets.yaml under this id - the compass rules
 		especially, because they are decisions (0014, 0023) wearing the appearance of styling.
 	]]
+	["GB-GAME-START-ISLAND"] = {
+		represents = "ASSET-START-ISLAND",
+		place = "game",
+		path = "Terrain at the origin; marker Workspace.GB_StartIslandMarker",
+		-- terrain, not runtime: it is in the saved place, so an Edit audit SHOULD find its marker
+	},
 	["GB-STARTER-LAUNCH"] = {
 		represents = "ASSET-BOAT-STARTER",
 		place = "game",

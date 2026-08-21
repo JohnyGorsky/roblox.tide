@@ -1,7 +1,15 @@
 # FINDING 0018: A crew can reach the edge of the bounded ocean inside a single expedition - the sea does not actually feel infinite once something can cross it
 
 **Project:** `roblox.tide`
-**Status:** open
+**Status:** fixed (2026-08-21) — Answered by decision 0025: grow the ocean north into a corridor rather than a bigger square. X stays at +/-3072, Z runs -1000 to +12000, which is 2.1x the current water (79.9M vs 37.7M studs squared) and about 1.4s of FillRegion against job 007's measured 0.68s for 36 tiles.
+
+The key realisation is that the first cost estimate was wrong: it assumed a larger SQUARE and came out at ~10x the terrain. The voyage is directional, so only Z needs to grow, and the nearest water edge stays east-west at 3072 - so fogEnd stays at 2900 and the whole horizon treatment carries over untouched. Growing a square would have forced view distance up with it, which is where the real cost would have been.
+
+Recentring the world on the vessel was the recommended option and was rejected deliberately: it is genuinely unbounded, and the buoyancy discontinuity turned out to be solvable in one line (WaveField.HeightAt sampling in the shifted frame rather than absolute XZ), but it taxes every future island, POI and spawn with a moving origin forever.
+
+NOT fully closed as a concept: the sea is now big enough for the run decision 0024 specifies, which is a weaker claim than infinite. A crew that deliberately drives east for ten minutes still finds an edge until decision 0002's east-west wrap exists, and the finding is still worth re-reading before any vessel faster than the starter launch ships. Re-open it if a future job needs true unboundedness.
+
+Implementation note recorded in 0025: OCEAN_HALF_EXTENT becomes two extents and is read in five places across SeaStates, WaveField, DayNight and AdminTools; insideOcean and validateFogWithinOcean are the two that carry meaning. The Z extent must cover the entire voyage, because HeightAt returns flat water outside the patch - a hull that reaches the end stops floating on waves, and it looks like the wave field breaking rather than like running out of world.
 **Severity:** high
 **Created:** 2026-08-20 23:20:41
 

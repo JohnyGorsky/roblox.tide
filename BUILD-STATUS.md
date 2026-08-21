@@ -105,9 +105,9 @@ Groups are sized to be taken one at a time. See [docs/build/README.md](docs/buil
 
 | Status | Count |
 |---|---|
-| GRAYBOX | 4 |
+| GRAYBOX | 5 |
 | IDEA | 9 |
-| IMPLEMENTED | 5 |
+| IMPLEMENTED | 6 |
 
 ### Graybox placeholders awaiting real art
 
@@ -117,6 +117,7 @@ Groups are sized to be taken one at a time. See [docs/build/README.md](docs/buil
 | `GB-CLOUD-TEXTURE` | ASSET-CLOUD-WALL | game | The storm's cloud wall and all its rain/spray are built from BUILT-IN engine textures - rbxasset://textures/particles/smoke_main.dds for the cloud bank and spray, sparkles_main.dds for rain. Registered as graybox because smoke_main is standing in for real cloud art, and because the wall's whole look depends on one property of it: it is a soft radial ALPHA blob, so every particle fades to nothing at its own edge and the mass has no silhouette line anywhere. That is what made particles work where flat geometry failed - a transparent slab always reads as a grey card (job 018, four attempts). Approved by eye for the POC, so this is not urgent; the escalation, if it ever stops convincing, is a real cloud texture with an alpha channel. Costs nothing today and needs no moderation, which is why it shipped. |
 | `GB-GAME-DECK` | ASSET-BOAT-STARTER | game | 48 x 2 x 32 DiamondPlate deck at Y=3 with four low rails, Wet Steel. Exists because the game place runs CharacterAutoLoads=false by design, so a developer pressing Play gets no body and there is nothing to stand on. Paired with the admin panel's 'Spawn me a character' tool. Represents the starter vessel because standing on the launch's DECK is what replaces this - so the graybox audit will keep reporting it until GAME-0001 lands, which is intended. Delete it then; do not build anything that depends on its position. |
 | `GB-STARTER-LAUNCH` | ASSET-BOAT-STARTER | game | THE WHOLE SHIP IS A GRAYBOX, not just her fittings. The hull is one 40 x 14 x 5 DiamondPlate box in Wet Steel, and every fitting on it is another box welded on: HelmConsole (3 x 3 x 1.5), Binnacle (1.8 x 0.6 x 1.8) and DamageControl (2.5 cube). All of it is built at RUN TIME by VesselServer.buildVessel, so it does not exist in Edit and the graybox audit reports it as runtime-only unless the audit is run in Play. Tagged Graybox on the MODEL with attribute GrayboxId=GB-STARTER-LAUNCH - one placeholder, not four. Deliberate, not neglect: job 021 built the KIT and decision 0009 is explicit that the starter launch is the kit's first customer rather than the thing being built. Real geometry replaces all of it, and the compass was approved by eye on 2026-08-21 as a READING, not as a look. |
+| `GB-GAME-START-ISLAND` | ASSET-START-ISLAND | game | Where the crew stands for the five-minute boarding grace (decision 0024), sculpted in job 024. Same technique as the lobby hub, scaled: 120 studs across, flat plateau at Y=+12 and 60 studs across, bands at 30/42/47/60. Measured ONE distinct plateau height across 112 columns and only 19 shelf-artifact columns. Registered as a graybox rather than final because it is functional geometry that has had no art pass - the LOBBY island is the one the user asked to be a real sculpt. Terrain cannot carry a CollectionService tag, so a transparent marker part at the centre holds GrayboxId for the audit. Its radius is set by the launch: VesselServer spawns it at (70,0,0) with a 14-wide hull, so the outer shelf stops at 60. Verified after the fill - the spawn point reads open water with the seabed 56 studs down, and the port side at (63,0,0) is 20 studs clear of the 1.8-stud draft. |
 
 Verify against the live places with `tools/audit-graybox.luau` - it catches placeholders
 that exist in Studio but were never registered.
@@ -145,6 +146,8 @@ that exist in Studio but were never registered.
 - [x] **020** Admin panel: collapsible sections, client-side tools, time-of-day and audio solo
 - [x] **021** Vessel foundation: chassis, socket kit, buoyancy, helm and fuel
 - [x] **022** The storm's teeth: hull damage and system faults inside The Wall
+- [ ] **023** The run — a corridor to voyage, a storm on a leash, and three ways to end
+- [x] **024** Sculpt and paint two islands: the lobby hub and the game start island
 
 An unchecked job is still in flight.
 

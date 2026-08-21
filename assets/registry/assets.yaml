@@ -239,3 +239,46 @@ assets:
     them is the crew-coordination mechanic (decision 0014), not an accident of layout. And read
     finding 0021 first: the spec labels +Z as the bow while she drives toward -Z, so socket positions do
     not mean what their names say.
+- id: ASSET-LOBBY-ISLAND
+  type: terrain
+  status: IMPLEMENTED
+  source: claude
+  place: lobby
+  roblox_path: Terrain (centred on origin)
+  feature: GAME-0013
+  notes: >-
+    The lobby hub island, sculpted procedurally in job 024 at the user's request (overriding GROUND-RULES
+    line 40, which assigns hand-sculpted islands to the human). NOT a graybox - this is the real thing.
+    600 studs across overall; a genuinely FLAT plateau at Y=+14, 350 studs across, which is a functional
+    requirement rather than a look: party pads get placed on it in the editor (Planned 0002).
+    Profile: flat top to r=175, gentle upper beach to r=240, a STEEP face across the waterline to r=248,
+    then an underwater shelf to r=300. Coastline irregularity comes from noise on the band RADII rather
+    than on the heights, so the outline wanders while the top stays perfectly level - measured as ONE
+    distinct surface height across 4,404 columns.
+    The steep face is not a style choice: land whose surface sits between the water level and about +8
+    renders as hole-riddled sheets, so the profile crosses that band in roughly one voxel column. Measured
+    240 columns in 0..+8 around a ~400-column shoreline ring, which is the floor for any land meeting
+    water, not a defect.
+    Painted Sand / Grass / LeafyGrass / Rock, with the sand-grass line following a noisy height contour
+    (clamped below the plateau, or patches of the flat top come out sand - which happened on the first pass).
+    GB_SpawnDock was moved to r=222..286 on the -X bearing as a jetty running from the beach crest out over
+    20 studs of water; the SpawnLocation sits on the plateau.
+- id: GB-GAME-START-ISLAND
+  type: graybox
+  status: GRAYBOX
+  source: claude
+  represents: ASSET-START-ISLAND
+  place: game
+  roblox_path: Terrain (centred on origin); marker part Workspace.GB_StartIslandMarker
+  feature: GAME-0001
+  notes: >-
+    Where the crew stands for the five-minute boarding grace (decision 0024), sculpted in job 024. Same
+    technique as the lobby hub, scaled: 120 studs across, flat plateau at Y=+12 and 60 studs across, bands
+    at 30/42/47/60. Measured ONE distinct plateau height across 112 columns and only 19 shelf-artifact
+    columns.
+    Registered as a graybox rather than final because it is functional geometry that has had no art pass -
+    the LOBBY island is the one the user asked to be a real sculpt. Terrain cannot carry a
+    CollectionService tag, so a transparent marker part at the centre holds GrayboxId for the audit.
+    Its radius is set by the launch: VesselServer spawns it at (70,0,0) with a 14-wide hull, so the outer
+    shelf stops at 60. Verified after the fill - the spawn point reads open water with the seabed 56 studs
+    down, and the port side at (63,0,0) is 20 studs clear of the 1.8-stud draft.
