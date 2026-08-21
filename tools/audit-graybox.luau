@@ -52,6 +52,18 @@ local REGISTERED: { [string]: { represents: string, place: string, path: string,
 		path = "Terrain at the origin; marker Workspace.GB_StartIslandMarker",
 		-- terrain, not runtime: it is in the saved place, so an Edit audit SHOULD find its marker
 	},
+	["GB-TENDER"] = {
+		represents = "ASSET-BOAT-TENDER",
+		place = "game",
+		path = "Workspace.Tender",
+		runtime = true, -- built by TenderServer
+	},
+	["GB-FUEL-BARREL"] = {
+		represents = "ASSET-FUEL-BARREL",
+		place = "game",
+		path = "Workspace.FuelBarrel (x4)",
+		runtime = true, -- built by TenderServer
+	},
 	["GB-STARTER-LAUNCH"] = {
 		represents = "ASSET-BOAT-STARTER",
 		place = "game",

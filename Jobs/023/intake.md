@@ -3,7 +3,7 @@
 **Project**: `roblox.tide`
 **Created**: 2026-08-21
 **Re-scoped**: 2026-08-21 — see *Why this changed*
-**Status**: Requirements Gathering (intake)
+**Status**: ✅ Complete — see [final-summary.md](final-summary.md)
 
 ## Why this changed
 
@@ -23,7 +23,8 @@ storm starts the instant the server does, there is nowhere to voyage to, and ves
 
 Scope, all in the **game place**:
 
-1. **Grow the ocean into a corridor** — decision 0025. X unchanged at ±3,072, Z from −1,000 to +12,000.
+1. **Grow the ocean into a corridor** — decision 0025. X unchanged at ±3,072, Z from −1,000 north. (Shipped at 5,500 rather than 0025's 12,000 — the
+   corridor invariant plus a mobile terrain budget; see the final summary.)
    `OCEAN_HALF_EXTENT` becomes two extents. The Z extent must cover the whole voyage, because
    `WaveField.HeightAt` returns flat water outside the patch and a hull that reaches the end stops floating on
    waves at all.
@@ -72,7 +73,7 @@ yet), the lobby, departure, the return teleport, and the finale vessel itself.
 
 | Id | Stands in for | Place | Note |
 |---|---|---|---|
-| `GB-GAME-START-ISLAND` | `ASSET-START-ISLAND` | game | The island the run opens on. Graybox here — the *lobby* island is the one being sculpted |
+| `GB-GAME-START-ISLAND` | `ASSET-START-ISLAND` | game | ✅ Built and registered in job 024 |
 | `GB-TENDER` | `ASSET-BOAT-TENDER` | game | The fuel-free rescue boat. A box until it earns a model |
 | `GB-FUEL-BARREL` | `ASSET-FUEL-BARREL` | game | Drifting barrels. Group 03 already plans a real jerry can and barrel |
 | `GB-STARTER-LAUNCH` | `ASSET-BOAT-STARTER` | game | Already registered, job 022. Unchanged |
@@ -84,7 +85,9 @@ geometry, so that deletion is the user's call.
 ## Checklist
 
 - [x] Requirements reviewed (this intake)
-- [ ] Implementation plan created & agreed
-- [ ] Implementation completed
-- [ ] Verified in a session
-- [ ] Final summary + changelog written
+- [x] Implementation plan created & agreed
+- [x] Implementation completed
+- [x] Verified in a session — corridor continuous, grace holds, run resolved Finished at 2,402/2,400 in 144 s,
+      tender 4.82 studs/s against the 8.75 break-even
+- [x] Final summary + changelog written
+- [ ] Two items deferred on purpose: the passage home (Planned 0002) and storm damage to the tender

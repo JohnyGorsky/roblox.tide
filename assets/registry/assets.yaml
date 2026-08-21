@@ -282,3 +282,39 @@ assets:
     Its radius is set by the launch: VesselServer spawns it at (70,0,0) with a 14-wide hull, so the outer
     shelf stops at 60. Verified after the fill - the spawn point reads open water with the seabed 56 studs
     down, and the port side at (63,0,0) is 20 studs clear of the 1.8-stud draft.
+- id: GB-TENDER
+  type: graybox
+  status: GRAYBOX
+  source: studio
+  represents: ASSET-BOAT-TENDER
+  place: game
+  roblox_path: Workspace.Tender (runtime-built by TenderServer)
+  feature: GAME-0001
+  notes: >-
+    The fuel-free rescue boat (job 023, decision 0024). Built through the vessel KIT rather than hand-rolled -
+    a second Vessel.Spec at 6 x 2.5 x 12, density 1.2, draft 0.8, four buoyancy points - so it inherits the
+    clamped buoyancy that stopped the launch destroying itself in job 021, and it is the first real test that
+    decision 0009's derivations hold at a twentieth of the launch's mass (216 against 4200).
+    A WoodPlanks box until it earns a model. Runtime-built, so an Edit-mode graybox audit reports it as
+    runtime-only.
+    HARD CONSTRAINT ON ANY REPLACEMENT: cruise must stay under 8.75 studs/s, which is
+    StormFront.ADVANCE_RATE / GAIN_PER_STUD. A fuel-free boat faster than that gains ground on the storm
+    forever and makes the launch, and the whole fuel economy it exists to consume, pointless. Measured at 4.82
+    studs/s settled with the front still closing at -13.80.
+- id: GB-FUEL-BARREL
+  type: graybox
+  status: GRAYBOX
+  source: studio
+  represents: ASSET-FUEL-BARREL
+  place: game
+  roblox_path: Workspace.FuelBarrel x4 (runtime-built by TenderServer)
+  feature: GAME-0001
+  notes: >-
+    Drifting diesel barrels, 4 of them at 200-400 studs, 35 fuel each against the launch's 100 capacity (job
+    023). A CorrodedMetal cylinder until group 03's real barrel exists - that group already plans both a jerry
+    can and a barrel, so this is a placeholder with a known replacement.
+    ANCHORED and positioned onto the wave surface each frame rather than floated: terrain water buoys
+    unanchored parts toward a FLAT Y=0 plane (finding 0008), which would fight the wave field and read as
+    jitter. Nothing about a barrel needs simulating - it needs to look like it is bobbing and to be reachable.
+    The 200-400 band is decision 0024's cost table: a round trip at the tender's 6 studs/s costs 22-44% of the
+    storm's 4200-stud cushion. Keep that band when replacing them; the distance IS the mechanic.

@@ -105,7 +105,7 @@ Groups are sized to be taken one at a time. See [docs/build/README.md](docs/buil
 
 | Status | Count |
 |---|---|
-| GRAYBOX | 5 |
+| GRAYBOX | 7 |
 | IDEA | 9 |
 | IMPLEMENTED | 6 |
 
@@ -118,6 +118,8 @@ Groups are sized to be taken one at a time. See [docs/build/README.md](docs/buil
 | `GB-GAME-DECK` | ASSET-BOAT-STARTER | game | 48 x 2 x 32 DiamondPlate deck at Y=3 with four low rails, Wet Steel. Exists because the game place runs CharacterAutoLoads=false by design, so a developer pressing Play gets no body and there is nothing to stand on. Paired with the admin panel's 'Spawn me a character' tool. Represents the starter vessel because standing on the launch's DECK is what replaces this - so the graybox audit will keep reporting it until GAME-0001 lands, which is intended. Delete it then; do not build anything that depends on its position. |
 | `GB-STARTER-LAUNCH` | ASSET-BOAT-STARTER | game | THE WHOLE SHIP IS A GRAYBOX, not just her fittings. The hull is one 40 x 14 x 5 DiamondPlate box in Wet Steel, and every fitting on it is another box welded on: HelmConsole (3 x 3 x 1.5), Binnacle (1.8 x 0.6 x 1.8) and DamageControl (2.5 cube). All of it is built at RUN TIME by VesselServer.buildVessel, so it does not exist in Edit and the graybox audit reports it as runtime-only unless the audit is run in Play. Tagged Graybox on the MODEL with attribute GrayboxId=GB-STARTER-LAUNCH - one placeholder, not four. Deliberate, not neglect: job 021 built the KIT and decision 0009 is explicit that the starter launch is the kit's first customer rather than the thing being built. Real geometry replaces all of it, and the compass was approved by eye on 2026-08-21 as a READING, not as a look. |
 | `GB-GAME-START-ISLAND` | ASSET-START-ISLAND | game | Where the crew stands for the five-minute boarding grace (decision 0024), sculpted in job 024. Same technique as the lobby hub, scaled: 120 studs across, flat plateau at Y=+12 and 60 studs across, bands at 30/42/47/60. Measured ONE distinct plateau height across 112 columns and only 19 shelf-artifact columns. Registered as a graybox rather than final because it is functional geometry that has had no art pass - the LOBBY island is the one the user asked to be a real sculpt. Terrain cannot carry a CollectionService tag, so a transparent marker part at the centre holds GrayboxId for the audit. Its radius is set by the launch: VesselServer spawns it at (70,0,0) with a 14-wide hull, so the outer shelf stops at 60. Verified after the fill - the spawn point reads open water with the seabed 56 studs down, and the port side at (63,0,0) is 20 studs clear of the 1.8-stud draft. |
+| `GB-TENDER` | ASSET-BOAT-TENDER | game | The fuel-free rescue boat (job 023, decision 0024). Built through the vessel KIT rather than hand-rolled - a second Vessel.Spec at 6 x 2.5 x 12, density 1.2, draft 0.8, four buoyancy points - so it inherits the clamped buoyancy that stopped the launch destroying itself in job 021, and it is the first real test that decision 0009's derivations hold at a twentieth of the launch's mass (216 against 4200). A WoodPlanks box until it earns a model. Runtime-built, so an Edit-mode graybox audit reports it as runtime-only. HARD CONSTRAINT ON ANY REPLACEMENT: cruise must stay under 8.75 studs/s, which is StormFront.ADVANCE_RATE / GAIN_PER_STUD. A fuel-free boat faster than that gains ground on the storm forever and makes the launch, and the whole fuel economy it exists to consume, pointless. Measured at 4.82 studs/s settled with the front still closing at -13.80. |
+| `GB-FUEL-BARREL` | ASSET-FUEL-BARREL | game | Drifting diesel barrels, 4 of them at 200-400 studs, 35 fuel each against the launch's 100 capacity (job 023). A CorrodedMetal cylinder until group 03's real barrel exists - that group already plans both a jerry can and a barrel, so this is a placeholder with a known replacement. ANCHORED and positioned onto the wave surface each frame rather than floated: terrain water buoys unanchored parts toward a FLAT Y=0 plane (finding 0008), which would fight the wave field and read as jitter. Nothing about a barrel needs simulating - it needs to look like it is bobbing and to be reachable. The 200-400 band is decision 0024's cost table: a round trip at the tender's 6 studs/s costs 22-44% of the storm's 4200-stud cushion. Keep that band when replacing them; the distance IS the mechanic. |
 
 Verify against the live places with `tools/audit-graybox.luau` - it catches placeholders
 that exist in Studio but were never registered.
@@ -146,9 +148,9 @@ that exist in Studio but were never registered.
 - [x] **020** Admin panel: collapsible sections, client-side tools, time-of-day and audio solo
 - [x] **021** Vessel foundation: chassis, socket kit, buoyancy, helm and fuel
 - [x] **022** The storm's teeth: hull damage and system faults inside The Wall
-- [ ] **023** The run — a corridor to voyage, a storm on a leash, and three ways to end
+- [x] **023** The run — a corridor to voyage, a storm on a leash, and three ways to end
 - [x] **024** Sculpt and paint two islands: the lobby hub and the game start island
-- [ ] **025** The lobby's atmosphere: a harbour sky, a calm sea, and a storm that never arrives
+- [x] **025** The lobby's atmosphere: a harbour sky, a calm sea, and a storm that never arrives
 
 An unchecked job is still in flight.
 

@@ -2,7 +2,7 @@
 
 **Project**: `roblox.tide`
 **Created**: 2026-08-21
-**Status**: In flight — steps 1–4 and 8 landed and measured; 6, 7, 9 remain
+**Status**: ✅ Complete — all steps landed and measured. See [final-summary.md](final-summary.md)
 
 ## Progress (2026-08-21)
 
