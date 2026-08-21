@@ -391,6 +391,20 @@ local function buildVessel()
 	local restingY = Vessel.restingY(spec, SeaStates.WATER_Y)
 	local model = Vessel.build(spec, CFrame.new(SPAWN_OFFSET + Vector3.new(0, restingY, 0)))
 	model.Parent = workspace
+	--[[
+		🔴 THE WHOLE SHIP IS A GRAYBOX, and it says so out loud.
+
+		The hull is one DiamondPlate box and every fitting is another box welded to it. Registered as
+		`GB-STARTER-LAUNCH` so `tools/audit-graybox.luau` reports it rather than letting a grey block quietly
+		ship - the registry entry also records WHAT MUST SURVIVE the restyle, which matters more than the
+		boxes do: the compass rules are decisions 0014 and 0023 wearing the appearance of styling.
+
+		Tagged on the MODEL rather than on each part: it is one placeholder, not four.
+
+		The audit knows this one is `runtime = true`, so it will not report it missing when run in Edit.
+	]]
+	CollectionService:AddTag(model, "Graybox")
+	model:SetAttribute("GrayboxId", "GB-STARTER-LAUNCH")
 	local hull = model.PrimaryPart :: BasePart
 	state.model, state.hull = model, hull
 

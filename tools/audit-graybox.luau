@@ -17,8 +17,14 @@ local CollectionService = game:GetService("CollectionService")
 local LOBBY_ID = 91870148721134
 local GAME_ID = 100885379547959
 
--- id -> { represents, place, path }
-local REGISTERED: { [string]: { represents: string, place: string, path: string } } = {
+--[[
+	id -> { represents, place, path, runtime }
+
+	`runtime = true` means the placeholder is BUILT BY A SCRIPT and so does not exist in Edit. Those are
+	skipped by the missing-check below, because reporting a runtime-built part as missing in an Edit audit
+	is a false alarm - and an audit that cries wolf is an audit people stop reading.
+]]
+local REGISTERED: { [string]: { represents: string, place: string, path: string, runtime: boolean? } } = {
 	["GB-LOBBY-DOCK"] = {
 		represents = "ASSET-LOBBY-HARBOUR-DOCK",
 		place = "lobby",
@@ -28,6 +34,23 @@ local REGISTERED: { [string]: { represents: string, place: string, path: string 
 		represents = "ASSET-BOAT-STARTER",
 		place = "game",
 		path = "Workspace.GB_ObservationDeck",
+	},
+	--[[
+		THE WHOLE SHIP IS A GRAYBOX. Not the fittings - the vessel.
+
+		The hull is a single 40 x 14 x 5 DiamondPlate box and every fitting on it (helm console, binnacle,
+		damage-control locker) is another box welded to it. That is deliberate: job 021 built the KIT, and
+		decision 0009 is explicit that the starter launch is the kit's first customer rather than the thing
+		being built. Real geometry replaces all of it.
+
+		What must SURVIVE the restyle is in assets/registry/assets.yaml under this id - the compass rules
+		especially, because they are decisions (0014, 0023) wearing the appearance of styling.
+	]]
+	["GB-STARTER-LAUNCH"] = {
+		represents = "ASSET-BOAT-STARTER",
+		place = "game",
+		path = "Workspace.StarterLaunch (whole model, hull + all fittings)",
+		runtime = true, -- built by VesselServer.buildVessel, so absent in Edit
 	},
 }
 
@@ -97,11 +120,19 @@ else
 end
 
 -- 2. registered for this place but absent
+local runtimeOnly = 0
 for id, reg in pairs(REGISTERED) do
 	if reg.place == placeName and not seen[id] then
-		missing += 1
-		table.insert(out, ("MISSING    %-22s registered for %s, not found in the place (expected %s)"):format(
-			id, reg.place, reg.path))
+		if reg.runtime then
+			-- script-built, so its absence in Edit says nothing at all. Run this in Play to see it.
+			runtimeOnly += 1
+			table.insert(out, ("RUNTIME    %-22s -> %-26s built at run time; audit in Play to check it"):format(
+				id, reg.represents))
+		else
+			missing += 1
+			table.insert(out, ("MISSING    %-22s registered for %s, not found in the place (expected %s)"):format(
+				id, reg.place, reg.path))
+		end
 	end
 end
 
@@ -126,8 +157,8 @@ if suspects == 0 then
 end
 
 table.insert(out, "")
-table.insert(out, ("SUMMARY  %d tracked, %d UNTRACKED, %d missing, %d untagged suspects"):format(
-	tracked, untracked, missing, suspects))
+table.insert(out, ("SUMMARY  %d tracked, %d UNTRACKED, %d missing, %d runtime-only, %d untagged suspects"):format(
+	tracked, untracked, missing, runtimeOnly, suspects))
 if untracked > 0 then
 	table.insert(out, "-> Add the UNTRACKED ones to assets/registry/assets.yaml with a represents: field,")
 	table.insert(out, "   and to REGISTERED in this script. An unregistered graybox is a mystery block.")

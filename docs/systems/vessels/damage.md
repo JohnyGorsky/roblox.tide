@@ -114,8 +114,10 @@ Admin panel | 44 tools, all scopes valid, **built exactly once** |
 Two things a probe cannot answer, both because a backgrounded Studio window does not render
 (finding 0022):
 
-1. **Compass orientation.** The maths is verified; whether "up" on the binnacle's top face points at the bow
-   is a look-and-see. `COMPASS_SIGN` and `COMPASS_OFFSET_DEG` in `VesselClient` exist for that correction.
+1. ~~Compass orientation.~~ **Approved by eye 2026-08-21** — it reads correctly, so `COMPASS_SIGN = -1`
+   and `COMPASS_OFFSET_DEG = 0` stand. Approved as a reading, not as a look: the vessel is a graybox
+   (`GB-STARTER-LAUNCH`) and gets restyled with the real boat. The rules that must survive that restyle are
+   in the registry entry's `survives_the_restyle` block — read it before redrawing the binnacle.
 2. **The damage-control prompt.** Present and configured (3 s hold, 10-stud range), but `Triggered` cannot be
    fired from a script, so the repair path has never been exercised by a hold.
 

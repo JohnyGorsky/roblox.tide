@@ -141,8 +141,9 @@ check is weak for the same reason — and rots (14 was right at job 019; job 021
 - [x] `VesselHeading` unreadable from a client; client attribute list audited
 - [x] No new analyzer diagnostics in either place; no runtime errors or warnings
 - [x] Play session stopped, Studio left in Edit
-- [ ] **Compass orientation by eye** — does "up" on the binnacle point at the bow? `COMPASS_SIGN` and
-      `COMPASS_OFFSET_DEG` exist for the correction
+- [x] **Compass approved by eye 2026-08-21** — it reads correctly, so `COMPASS_SIGN = -1` and
+      `COMPASS_OFFSET_DEG = 0` are right and need no correction. Approved as a READING, not as a look: the
+      whole vessel is a graybox and will be restyled with the real boat
 - [ ] **Damage-control hold** — the prompt is present and configured, but `Triggered` cannot be fired from a
       script, so the repair path has never been exercised
 - [ ] **Compass readability at The Wall's brightness 0.30** — `LightInfluence = 0` should make it immune,
@@ -151,6 +152,21 @@ check is weak for the same reason — and rots (14 was right at job 019; job 021
       `VesselTestDrive` hook, because the helm loop cannot run unfocused (finding 0022)
 - [ ] **Lobby place sync** — its `AdminTools` reads 47,012 chars against 57,845 on disk. Nothing in job 022
       needs it, but the two copies are meant to stay byte-identical
+
+## The ship is a graybox, and it now says so
+
+Registered as `GB-STARTER-LAUNCH` (whole model, hull + every fitting) after the compass review, because a
+grey block that nobody wrote down is how placeholder art ships by accident. The registry entry carries a
+`survives_the_restyle` block, which is the point of the exercise: seven of the compass's properties look like
+styling and are actually decisions 0014 and 0023 — physical not HUD, self-lit, unfaultable, rotating card
+under a fixed lubber line, square face, found by tag, on Heartbeat. Restyling is free; dropping any of those
+quietly voids The Wall.
+
+`tools/audit-graybox.luau` gained a `runtime` flag for it. The vessel is built by a script, so an Edit-mode
+audit would have reported it MISSING — a false alarm, and an audit that cries wolf stops being read.
+
+⚠️ `GB-GAME-DECK`'s own registry note says to delete it once `GAME-0001` lands, which it has. Left in place:
+it is editor geometry paired with the admin spawn tool, and removing place content is your call.
 
 ## Still owed
 

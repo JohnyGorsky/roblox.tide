@@ -292,8 +292,20 @@ local STARTER_LAUNCH: Spec = {
 	]]
 	survivability = 45,
 	--[[
-		Sockets. Positions are provisional until the hull exists and can be walked on - which is exactly why
-		the plan builds the chassis first and fits sockets last.
+		Sockets.
+
+		🔴 THESE OFFSETS ARE SCAFFOLDING, AND THEY HAVE AN EXPIRY DATE (decided 2026-08-21).
+
+		When the real ship model exists, the USER places each fitting in Studio's editor and this code reads
+		the attachments the model already carries. It does not position them. See
+		docs/systems/vessels/README.md - "Who places what".
+
+		So do not refine these numbers, and above all do not add a second positioning path beside them. What
+		stays true afterwards is the LOOKUP: every consumer finds its socket by NAME (`hull.Sockets.helm`),
+		never by a hardcoded offset, which is what makes the migration a deletion rather than a rewrite.
+
+		Afterwards this table declares only WHICH sockets a class has - names and `kind` - with the offsets
+		surviving as a fallback for a hull that carries no authored attachments, i.e. this graybox.
 	]]
 	sockets = {
 		helm = { kind = "helm", offset = Vector3.new(0, 2.5, 8) },

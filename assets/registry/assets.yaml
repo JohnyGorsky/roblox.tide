@@ -206,3 +206,36 @@ assets:
     vessel because standing on the launch's DECK is what replaces this - so the graybox audit will keep
     reporting it until GAME-0001 lands, which is intended. Delete it then; do not build anything that
     depends on its position.
+- id: GB-STARTER-LAUNCH
+  type: graybox
+  status: GRAYBOX
+  source: studio
+  represents: ASSET-BOAT-STARTER
+  place: game
+  roblox_path: Workspace.StarterLaunch
+  feature: GAME-0001
+  notes: >-
+    THE WHOLE SHIP IS A GRAYBOX, not just her fittings. The hull is one 40 x 14 x 5 DiamondPlate box in
+    Wet Steel, and every fitting on it is another box welded on: HelmConsole (3 x 3 x 1.5), Binnacle
+    (1.8 x 0.6 x 1.8) and DamageControl (2.5 cube). All of it is built at RUN TIME by
+    VesselServer.buildVessel, so it does not exist in Edit and the graybox audit reports it as
+    runtime-only unless the audit is run in Play. Tagged Graybox on the MODEL with
+    attribute GrayboxId=GB-STARTER-LAUNCH - one placeholder, not four.
+    Deliberate, not neglect: job 021 built the KIT and decision 0009 is explicit that the starter launch
+    is the kit's first customer rather than the thing being built. Real geometry replaces all of it, and
+    the compass was approved by eye on 2026-08-21 as a READING, not as a look.
+  survives_the_restyle: >-
+    What the new geometry must keep, because these are DECISIONS wearing the appearance of styling.
+    (1) The compass is a physical instrument on the vessel, never a screen overlay - decision 0014 is
+    explicit that a HUD heading makes The Wall's blindness free. (2) It is self-lit, LightInfluence 0, or
+    it cannot be read at The Wall's brightness of 0.30. (3) Nothing may ever fault or destroy it; it is
+    the floor beneath pillar 6, and the thing to threaten instead is the CHART. (4) The card rotates under
+    a fixed lubber line, not a needle over a fixed card - that is what makes it report which way YOU are
+    pointing. (5) Whatever face it sits on must be SQUARE, or a round card renders as a stadium; the
+    binnacle exists as its own part for that reason alone. (6) It is found by CollectionService tag
+    VesselCompassCard, never by instance path (finding 0020). (7) Its loop is on Heartbeat, not
+    RenderStepped, or it stops running whenever the window is not rendering (finding 0022).
+    Also keep: the helm and the damage-control locker at OPPOSITE ends of the deck - the distance between
+    them is the crew-coordination mechanic (decision 0014), not an accident of layout. And read
+    finding 0021 first: the spec labels +Z as the bow while she drives toward -Z, so socket positions do
+    not mean what their names say.

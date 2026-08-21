@@ -6,6 +6,54 @@ Design the game around a generic `Vessel` concept from the beginning, even if th
 
 Avoid hard-coding core systems around a single fixed starter boat.
 
+## 🔴 Who places what: the user places, the code wires
+
+**Decided 2026-08-21.** Once a real ship model exists, **the user places every fitting where it must go, in
+Studio's editor.** Code finds those placements by name and attaches behaviour to them. It does not position
+them.
+
+Same rule as the Last River lobby, and it matters more on a vessel: a fitting's position is read against the
+*hull's shape*. A console 8 studs forward of centre is meaningful on a modelled wheelhouse and arbitrary on a
+box.
+
+### What exists today is scaffolding, not the target
+
+`Vessel.build` currently creates the hull, a `Sockets` folder of named attachments from `spec.sockets`
+Vector3 offsets, and a welded box per fitting. The whole vessel is registered as the graybox
+`GB-STARTER-LAUNCH` for exactly this reason.
+
+### The seam, and how to keep it clean
+
+The consumer side is **already correct** and must stay that way — everything looks its socket up by name:
+
+```lua
+local sockets = hull:FindFirstChild("Sockets")
+local helm = sockets:FindFirstChild("helm")          -- never a hardcoded offset
+```
+
+So the migration when a real hull lands is small, and it is one rule:
+
+> **Read the attachments the model already carries. Do not create them from spec offsets, and do not add a
+> second positioning path.**
+
+After that, `spec.sockets` declares only **which sockets a class has** — names and `kind` — not where they
+sit. Offsets survive as a fallback for a hull with no authored attachments, which is what keeps the graybox
+working.
+
+⚠️ Two traps when interpreting authored positions:
+
+- **Finding 0021**: the spec labels `+Z` as the bow while the hull drives toward `-Z` (`LookVector`). Authored
+  positions will mean what the *artist* saw, so settle the convention before reading them.
+- Before redrawing any fitting, read `survives_the_restyle` on `GB-STARTER-LAUNCH` in
+  `assets/registry/assets.yaml`. Several compass properties look like styling and are decisions
+  [0014](../../decisions/0014-storm-consequence.md) and [0023](../../decisions/0023-storm-damage-model.md).
+
+### What this does NOT change
+
+Physics stays **derived from stated intent** — `draft`, `cruise`, `rudderLag`, `survivability` — per decision
+[0009](../../decisions/0009-vessel-class-architecture.md). This rule is about **placement**, not tuning. A
+hand-authored spring constant is still the thing that breaks the kit.
+
 ## How the classes differ, mechanically
 
 Three independent numbers, so "bigger" is not one dial:
