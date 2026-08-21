@@ -33,7 +33,26 @@ Hard constraints:
 
 Out of scope: islands beyond the start island and sea POIs (group 04), nearest shelter (no shelter exists to moor at), named contacts (needs island identity), skills actually changing the range (progression, decisions 0008/0012 - the hook ships, the upgrade does not), and the audible ping asset.
 
-ASSET NEEDED FROM THE USER - one sound, and a searchable spec: a radar/sonar sweep tick plus a contact ping. Short (under 1s), dry, mechanical rather than sci-fi, no reverb baked in, mono. Search terms: 'radar ping', 'sonar ping', 'radar sweep', 'submarine sonar blip'. Free sources per the asset policy: Pixabay or the Creator Store's Pro Sound Effects library. It mounts positionally at the station so it is audible at the radar and not across the deck.
+ASSET RESOLVED 2026-08-21 - approved by the user after auditioning through the panel's thunder slot:
+
+| Name | rbxassetid | Length | Role |
+|---|---|---|---|
+| radar_sweep_1 | 9126138070 | 0.6 s | the tick as the beam passes |
+| radar_sweep_2 | 9126138068 | 0.5 s | VARIANT of the same tick |
+| radar_contact | 75886285262316 | - | a contact lighting up |
+
+Three clips for two slots, and the third is the point rather than a spare: the sweep fires every few seconds
+for a fifty-minute run, which is the worst case for audible repetition. Two variants alternating is the cheap
+fix and it is the same reasoning behind every bed in the audio registry. Both sweep clips are the same Pro
+Sound Effects 'Transmission Breakup - Sonar Or Tracker Tones' family so they sit together.
+
+The contact ping is a DIFFERENT clip on purpose - if it were the same sound the operator would have to watch
+to notice a contact, which defeats having audio at all.
+
+Mounted POSITIONALLY at the station, not 2D: the radar is a place on the boat you stand at, so its sound has
+to come from there. Logged in roblox.workspace/Assets/registry/audio.md with the rejections and why.
+
+ORIGINAL REQUEST, kept for the record - one sound, and a searchable spec: a radar/sonar sweep tick plus a contact ping. Short (under 1s), dry, mechanical rather than sci-fi, no reverb baked in, mono. Search terms: 'radar ping', 'sonar ping', 'radar sweep', 'submarine sonar blip'. Free sources per the asset policy: Pixabay or the Creator Store's Pro Sound Effects library. It mounts positionally at the station so it is audible at the radar and not across the deck.
 
 ## Checklist
 
