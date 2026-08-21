@@ -102,6 +102,19 @@ export type Spec = {
 	fuelCapacity: number,
 	--- Litres-ish per second at full throttle.
 	fuelBurn: number,
+	--[[
+		Seconds of CONTINUOUS FULL exposure inside The Wall this hull survives, unrepaired (job 022).
+
+		A statement of intent, in exactly the same family as `draft` and `rudderLag`: anyone can say how
+		tough a vessel is meant to be without knowing a single number about how damage is implemented.
+		`VesselDamage` derives the integrity pool, the damage rate and every fault threshold from this
+		plus the hull's own mass.
+
+		🔴 A hull must never declare an integrity figure or a damage-per-second directly. That is the same
+		break as hand-tuning a spring constant - decision 0009's promise is that seven vessel classes share
+		one set of derivations, and a per-hull damage number turns them back into seven boats.
+	]]
+	survivability: number,
 	sockets: { [string]: Socket },
 }
 
@@ -262,6 +275,23 @@ local STARTER_LAUNCH: Spec = {
 	fuelCapacity = 100,
 	fuelBurn = 0.55,
 	--[[
+		45 seconds of full exposure inside The Wall, chosen against the front's OWN numbers rather than by
+		feel (decision 0014's target is 30-60s of competent play).
+
+		The escape arithmetic, from `StormFront`: at cruise 18 due north the crew nets
+		18 x 1.6 - 14 = +14.8 studs/s, and the band edge is at distance 260. So clearing the front takes
+		17.6s from distance 0, and 48s from 450 studs deep.
+
+		45 therefore means: a crew that reacts the moment the world goes black gets out having spent roughly
+		40% of the hull, and a crew that spends twenty seconds working out what is happening does not get
+		out at all. Both of those are the intended stories.
+
+		30 was considered and rejected as leaving no room for a single mistake; 60 was rejected because it
+		makes dipping into the front to shorten a route a viable tactic, which is the "lingering as a
+		shortcut" decision 0014 explicitly forbids.
+	]]
+	survivability = 45,
+	--[[
 		Sockets. Positions are provisional until the hull exists and can be walked on - which is exactly why
 		the plan builds the chassis first and fits sockets last.
 	]]
@@ -274,6 +304,16 @@ local STARTER_LAUNCH: Spec = {
 		hardpointAft = { kind = "hardpoint", offset = Vector3.new(0, 3, -15), facing = 180 },
 		lightMast = { kind = "light", offset = Vector3.new(0, 7, 6) },
 		storageAft = { kind = "storage", offset = Vector3.new(0, 3, -6) },
+		--[[
+			Damage control (job 022). Deck level, starboard side, aft - clear of the generator at (-3, -10)
+			and the storage at (0, -6), and deliberately AWAY from the helm at (0, +8).
+
+			The distance is the point: a lone driver cannot hold the wheel and fight a breach at the same
+			time. That is the "every system has something to do at the worst possible moment" decision 0014
+			asks for, and it is the first place in the game where a second crew member is worth more than a
+			bigger engine.
+		]]
+		damageControl = { kind = "station", offset = Vector3.new(4, 2.5, -11) },
 	},
 }
 

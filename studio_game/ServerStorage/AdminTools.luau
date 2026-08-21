@@ -792,6 +792,181 @@ local function vessel()
 	return (_G :: any).TideVessel
 end
 
+--[[
+	🔴 THE SURVIVAL TEST. The tool this whole job is answerable to.
+
+	Decision 0014 states a number - "survivable for roughly 30-60 seconds of competent play" - and there is no
+	way to see whether that is true by looking at the game. Two things have to be measured, and they are
+	different questions:
+
+	  HOLD POSITION   how long does the hull last at full exposure?  Should equal the spec's `survivability`.
+	                  This checks the damage curve against the number a designer wrote.
+	  ESCAPE RUN      can a crew that reacts immediately get out, and at what cost?  Should clear the front
+	                  in the high teens of seconds with real integrity left.
+	                  This checks the curve against the STORM's constants, which is the harder question.
+
+	The two together are what "escapable in 30-60 seconds" actually means: staying is fatal on a known clock,
+	and leaving works if you leave now.
+
+	Both drive the REAL loop - the world tick advances the front, `VesselServer` applies the damage, the vessel
+	buys distance from its own northward travel. Nothing is simulated in the tool, which is the point: a
+	simulation would have re-derived the arithmetic and then agreed with itself.
+
+	⚠️ REFUSES TO RUN WITH A TIME SCALE SET. `WorldTick` scales the front's advance but not the vessel's
+	travel, so at scale 10 the crew loses ground ten times faster than they should and every number this
+	prints would be wrong in a direction that looks like a damage bug.
+]]
+tools.stormSurvivalTest = {
+	id = "stormSurvivalTest",
+	label = "Survival test (measured)",
+	section = "Storm",
+	scope = "global",
+	controls = {
+		kind = "choice",
+		options = { "escape run (full throttle north)", "hold position (time to loss)" },
+	},
+	run = function(_player: Player, args: any)
+		local V = vessel()
+		if not V then return false, "no vessel - is the game in Play?" end
+		local SF = stormFront()
+		if not SF then return false, "StormFront not found" end
+		local hull = V.state.hull
+		local spec = V.state.spec
+		if not hull or not spec then return false, "no hull" end
+
+		local scale = workspace:GetAttribute("TimeScale")
+		if typeof(scale) == "number" and scale ~= 1 then
+			return false, ("TimeScale is %.1f. Set it back to 1x (Storm -> Time scale) before measuring - it "
+				.. "speeds up the front but not the vessel, so every number here would be wrong."):format(scale)
+		end
+
+		local escaping = tostring(args and args.value):find("escape") ~= nil
+
+		--[[
+			Set up a KNOWN starting state, or the run is not repeatable: sound hull, full tank, and the front
+			exactly at the point of full exposure.
+
+			Distance 0 rather than somewhere further inside the band: it is the deepest point that is not
+			saturated arbitrarily, so it is the hardest honest start. Anything deeper only measures saturation.
+		]]
+		V.repairAll()
+		V.setFuel(spec.fuelCapacity)
+		SF.reset(0)
+
+		-- Point her north (+Z) and stop her dead, so acceleration is part of what is measured.
+		local position = hull.Position
+		hull.CFrame = CFrame.lookAt(position, position + Vector3.new(0, 0, 1))
+		hull.AssemblyLinearVelocity = Vector3.zero
+		hull.AssemblyAngularVelocity = Vector3.zero
+
+		--[[
+			Drive through the TEST HOOK rather than by writing `state.throttle`, so the input takes the same
+			path a driver's would and a driver at the helm cannot fight it. See the hook's note in
+			`VesselServer`.
+		]]
+		workspace:SetAttribute("VesselTestThrottle", escaping and 1 or 0)
+		workspace:SetAttribute("VesselTestSteer", 0)
+		workspace:SetAttribute("VesselTestDrive", true)
+
+		local SAMPLE = 0.25
+		local CAP = 120
+		local t0 = os.clock()
+		local wall = SF.wallAt()
+		local outcome, elapsed = "still going at the cap", CAP
+		local minIntegrity: number, maxSpeed: number = V.state.integrityMax, 0
+		local faultsSeen: { [string]: boolean } = {}
+
+		while os.clock() - t0 < CAP do
+			task.wait(SAMPLE)
+			local now = os.clock() - t0
+			minIntegrity = math.min(minIntegrity, V.state.integrity)
+			local speed = hull.AssemblyLinearVelocity:Dot(hull.CFrame.LookVector)
+			maxSpeed = math.max(maxSpeed, speed)
+			for id, on in pairs(V.state.faults) do
+				if on then
+					faultsSeen[id] = true
+				end
+			end
+			if V.state.lost then
+				outcome, elapsed = "VESSEL LOST", now
+				break
+			end
+			if escaping and SF.distance() >= wall then
+				outcome, elapsed = "cleared the front", now
+				break
+			end
+		end
+
+		-- Always hand the helm back, whatever happened.
+		workspace:SetAttribute("VesselTestDrive", false)
+		workspace:SetAttribute("VesselTestThrottle", 0)
+
+		local faults = {}
+		for id in pairs(faultsSeen) do
+			table.insert(faults, id)
+		end
+		table.sort(faults)
+
+		--[[
+			The verdict, stated against decision 0014 rather than left to the reader. A report that prints
+			numbers and no judgement gets skimmed, and the whole reason this is a tool is that the judgement
+			cannot be made by eye.
+		]]
+		local lost = outcome == "VESSEL LOST"
+		local verdict
+		if escaping then
+			if lost then
+				verdict = "🔴 A crew reacting IMMEDIATELY at full throttle still died. Either the curve is too "
+					.. "steep or she is not making enough way north - check max speed against cruise above."
+			elseif elapsed > 60 then
+				verdict = "⚠️ Escaped, but it took over a minute. Decision 0014 wants the front to be a "
+					.. "deadline, not a slog - suspect the storm's own constants rather than the damage."
+			elseif minIntegrity / V.state.integrityMax > 0.85 then
+				verdict = "⚠️ Escaped almost unscathed. Being caught should COST something, or The Wall is "
+					.. "scenery - consider a shorter survivability."
+			else
+				verdict = "✅ Escaped at a real cost. This is the intended story."
+			end
+		else
+			local target = spec.survivability
+			local ratio = elapsed / target
+			if not lost then
+				verdict = ("🔴 Held at full exposure for %.0fs and SURVIVED. The Wall is not a wall - loss was "
+					.. "expected at about %ds."):format(elapsed, target)
+			elseif ratio < 0.7 or ratio > 1.3 then
+				verdict = ("🔴 Died in %.1fs against a declared survivability of %ds (%.0f%%). The damage rate "
+					.. "and the spec disagree - the exposure ramp is the first suspect.")
+					:format(elapsed, target, ratio * 100)
+			else
+				verdict = ("✅ Died in %.1fs against %ds declared. The number a designer wrote is the number "
+					.. "the stopwatch read."):format(elapsed, target)
+			end
+		end
+
+		local theory = SF.secondsToEscape(0, spec.cruise)
+		return true, table.concat({
+			("mode        %s"):format(escaping and "escape run, full throttle north" or "hold position"),
+			("outcome     %s after %.1f s"):format(outcome, elapsed),
+			("integrity   %.0f / %.0f  (%.0f%% left, low water %.0f%%)"):format(
+				V.state.integrity, V.state.integrityMax,
+				V.state.integrity / math.max(V.state.integrityMax, 1) * 100,
+				minIntegrity / math.max(V.state.integrityMax, 1) * 100),
+			("distance    %.0f studs (the wall edge is %.0f)"):format(SF.distance(), wall),
+			("max speed   %.1f studs/s northward (cruise %d, min escape speed %.1f)"):format(
+				maxSpeed, spec.cruise, SF.minEscapeSpeed()),
+			("flooding    %.0f%%"):format(V.state.flooding * 100),
+			("faults      %s"):format(#faults > 0 and table.concat(faults, ", ") or "none"),
+			("theory      escape from distance 0 at cruise %d should take %s"):format(
+				spec.cruise, theory and ("%.1f s"):format(theory) or "forever - she cannot gain ground"),
+			("            the hull should empty in %ds at full exposure"):format(spec.survivability),
+			"",
+			verdict,
+			"",
+			"The front is left where the test finished. Storm -> Storm distance puts it back.",
+		}, "\n")
+	end,
+}
+
 tools.vesselStatus = {
 	id = "vesselStatus",
 	label = "Vessel status",
@@ -895,6 +1070,88 @@ tools.vesselTeleport = {
 		root.CFrame = CFrame.new(hull.Position + Vector3.new(0, hull.Size.Y / 2 + 4, 0))
 		return true, ("on the deck at %s. It is a moving platform, so you should ride it."):format(
 			tostring(hull.Position))
+	end,
+}
+
+--[[
+	DAMAGE TOOLS (job 022, decision 0014).
+
+	Global scope, all of them: hull integrity is one shared thing and there is no per-player view of it.
+	`vesselDamageReport` is the exception - reading a number changes nothing for anyone else.
+]]
+tools.vesselDamageReport = {
+	id = "vesselDamageReport",
+	label = "Damage report",
+	section = "Vessel",
+	scope = "local",
+	controls = { kind = "button", output = "text" },
+	run = function(_player: Player, _args: any)
+		local V = vessel()
+		if not V then return false, "no vessel - is the game in Play?" end
+		return true, V.damageReport()
+	end,
+}
+
+tools.vesselDamageSet = {
+	id = "vesselDamageSet",
+	label = "Set hull integrity",
+	section = "Vessel",
+	scope = "global",
+	controls = { kind = "choice", options = { "full", "75%", "50%", "25%", "critical (5%)" } },
+	run = function(_player: Player, args: any)
+		local V = vessel()
+		if not V then return false, "no vessel - is the game in Play?" end
+		local map = { full = 1, ["75%"] = 0.75, ["50%"] = 0.5, ["25%"] = 0.25, ["critical (5%)"] = 0.05 }
+		local f = map[tostring(args and args.value)]
+		if f == nil then return false, "unknown level" end
+		V.setIntegrity(f)
+		--[[
+			Says out loud that it did NOT fire the ladder, because the natural expectation is that dropping to
+			25% breaks things - and a tool that silently does less than you expect is worse than one that does
+			nothing. Inflicting a fault is a separate tool on purpose.
+		]]
+		return true, ("integrity %.0f/%.0f (%.0f%%). Faults NOT fired - the ladder is re-armed to match, so "
+			.. "storm exposure will fire from here. Use 'Inflict fault' to break something now.")
+			:format(V.state.integrity, V.state.integrityMax, f * 100)
+	end,
+}
+
+tools.vesselFault = {
+	id = "vesselFault",
+	label = "Inflict fault",
+	section = "Vessel",
+	scope = "global",
+	controls = {
+		kind = "choice",
+		options = { "engine cut", "hull breach", "steering", "radar (stub)", "generator (stub)", "REPAIR ALL" },
+	},
+	run = function(_player: Player, args: any)
+		local V = vessel()
+		if not V then return false, "no vessel - is the game in Play?" end
+		local choice = tostring(args and args.value)
+		if choice == "REPAIR ALL" then
+			V.repairAll()
+			return true, "all faults cleared, flooding pumped out, integrity restored, ladder re-armed"
+		end
+		local map = {
+			["engine cut"] = "engine",
+			["hull breach"] = "breach",
+			steering = "steering",
+			["radar (stub)"] = "radar",
+			["generator (stub)"] = "generator",
+		}
+		local id = map[choice]
+		if not id then return false, "unknown fault" end
+		V.inflict(id)
+		local notes = {
+			engine = ("thrust is dead for %ds; she keeps her way on and still answers the wheel")
+				:format(require(ReplicatedStorage.VesselDamage).ENGINE_CUT_SECONDS),
+			breach = "flooding is rising; she will sit lower and start taking water over the deck",
+			steering = "rudder authority cut - the turn takes more than twice as long to build",
+			radar = "flag only: GAME-0002 does not exist yet, so nothing consumes it",
+			generator = "flag only: there are no deck lights or radar power to lose yet",
+		}
+		return true, ("%s inflicted. %s\n\nDamage control is the locker on the aft deck - hold for 3s."):format(id, notes[id])
 	end,
 }
 

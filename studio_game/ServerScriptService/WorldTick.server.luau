@@ -67,18 +67,57 @@ local function timeScale(): number
 	return math.clamp(s, 0, MAX_TIME_SCALE)
 end
 
+--[[
+	Grace period before complaining that there is no vessel. See `vesselZ` below - the hull is built at the
+	end of `VesselServer`, so a couple of empty ticks at startup are normal and mean nothing.
+]]
+local NO_VESSEL_GRACE = 30
+local vesselSeenAt = os.clock()
+local warnedNoVessel = false
+
 local function vesselZ(): number?
 	--[[
-		Northward progress buys distance from the storm (decision 0019). There is no vessel yet, so this
-		returns nil and the front simply closes - which is the correct behaviour for a crew that cannot
-		move, and exactly what a fuel-less crew will experience.
+		Northward progress buys distance from the storm (decision 0019), and this is where that happens.
 
-		When GAME-0001 lands, return the hull's Z here.
+		🔴 THIS WAS BROKEN FROM JOB 021 UNTIL JOB 022, AND IT MADE THE STORM UNBEATABLE.
+
+		It used to look for `workspace.Vessels.Hull`. `VesselServer` parents the model straight to Workspace
+		under the spec id, so the real path is `workspace.StarterLaunch.Hull` - the folder `Vessels` never
+		existed at all. The lookup returned nil on every tick, `GAIN_PER_STUD` was never once applied, and
+		`distance` could only ever DECREASE. The storm was not merely hard to outrun; outrunning it was
+		arithmetically impossible, and nothing said so.
+
+		Two lessons, both worth the comment:
+
+		  1. A hardcoded instance path between two systems rots silently. This one read as a design choice
+		     ("the front simply closes") because the comment beside it was true when it was written and
+		     stopped being true one job later.
+		  2. Whatever replaces it must FAIL LOUDLY. Hence the warning below.
+
+		So this reads the SERVER-SIDE handle instead. `_G.TideVessel` is set by `VesselServer` and already
+		read by `AdminTools`; every server script shares one Luau VM, so it needs no instance path.
+
+		🔴 AND IT MUST STAY SERVER-SIDE. The obvious alternative - publish `VesselZ` as a Workspace
+		attribute like every other vessel number - would replicate the hull's northward coordinate to every
+		client. A client watching that number rise knows it is heading north, which is exactly the free
+		heading oracle decision 0014 forbids inside The Wall. `_G` does not replicate. Keep it there.
 	]]
-	local vessels = workspace:FindFirstChild("Vessels")
-	local hull = vessels and vessels:FindFirstChild("Hull")
-	if hull and hull:IsA("BasePart") then
+	local V = (_G :: any).TideVessel
+	local hull = V and V.state and V.state.hull
+	if hull and hull.Parent and hull:IsA("BasePart") then
+		vesselSeenAt = os.clock()
 		return hull.Position.Z
+	end
+	--[[
+		Warn ONCE if the vessel has not turned up within the grace period. The hull is built at the end of
+		`VesselServer`, so nil for the first tick or two is normal and means nothing. Nil for half a minute
+		means the link is broken again, and this time it announces itself instead of presenting as a storm
+		that closes no matter what the crew does.
+	]]
+	if not warnedNoVessel and os.clock() - vesselSeenAt > NO_VESSEL_GRACE then
+		warnedNoVessel = true
+		warn("[WORLD] no vessel after " .. NO_VESSEL_GRACE .. "s - northward progress is buying NOTHING and "
+			.. "the storm cannot be outrun. _G.TideVessel is missing; see WorldTick.vesselZ and job 022.")
 	end
 	return nil
 end

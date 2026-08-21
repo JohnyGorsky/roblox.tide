@@ -105,6 +105,80 @@ function StormFront.bandFor(distance: number)
 	return BANDS[#BANDS]
 end
 
+--[[
+	WHERE THE WALL BEGINS, and where being inside it is as bad as it gets (job 022).
+
+	`WALL_AT` is read from the band table rather than restated, so the two can never drift apart - the whole
+	point of the storm having ONE source for its bands.
+
+	`FULL_EXPOSURE_AT` is distance 0. Band 4 has no floor (`min = -math.huge`) because the front keeps
+	overtaking a crew that cannot move, so exposure has to saturate somewhere. Distance 0 is the choice, and
+	it is a mercy with a reason: 400 studs inside the wall is not meaningfully worse than 200, and making it
+	worse would mean a late reaction is unrecoverable no matter how well the crew then drove. Decision 0014
+	wants a crew punished for lingering, not for being slow to understand.
+]]
+StormFront.FULL_EXPOSURE_AT = 0
+
+function StormFront.wallAt(): number
+	return BANDS[#BANDS - 1].min -- the band ABOVE The Wall ends where The Wall starts
+end
+
+--[[
+	EXPOSURE, 0..1. How hard the front is working on whatever is out in it.
+
+	Zero outside band 4 entirely, and that edge is sharp on purpose. A crew in a Severe sea is being
+	THREATENED, not damaged - decision 0014 attaches the consequence to The Wall specifically, and bleeding a
+	little damage into the approach would turn a deadline into slow attrition. The whole macro loop depends on
+	the front being a line you can be on the right side of.
+
+	This is the storm's half of the damage model. What a given hull does with it belongs to `VesselDamage`.
+]]
+function StormFront.exposure(distance: number?): number
+	local d = distance or StormFront.distance()
+	local wall = StormFront.wallAt()
+	if d >= wall then
+		return 0
+	end
+	local span = wall - StormFront.FULL_EXPOSURE_AT
+	if span <= 0 then
+		return 1
+	end
+	return math.clamp((wall - d) / span, 0, 1)
+end
+
+--[[
+	THE ESCAPE ARITHMETIC. Seconds to claw back out of the front, at a given northward speed.
+
+	A function rather than a comment because it is the number decision 0014's 30-60 second target is actually
+	about, and because it is what the survival test checks the damage curve against. From the constants above
+	at cruise 18:
+
+	    net  =  18 x 1.6 - 14  =  +14.8 studs/s
+	    from distance    0  ->  260 studs  ->  17.6 s
+	    from distance -450  ->  710 studs  ->  48.0 s
+
+	Returns nil when the crew cannot gain ground at all, which is a real answer rather than an error: below
+	ADVANCE_RATE / GAIN_PER_STUD - 8.75 studs/s for these constants - the front closes faster than northward
+	travel buys distance, and no amount of patience gets them out. That threshold is worth knowing. It is the
+	speed a damaged or half-fuelled vessel has to stay above to have any escape at all.
+]]
+function StormFront.secondsToEscape(distance: number, northSpeed: number): number?
+	local net = northSpeed * StormFront.GAIN_PER_STUD - StormFront.ADVANCE_RATE
+	if net <= 0 then
+		return nil
+	end
+	local wall = StormFront.wallAt()
+	if distance >= wall then
+		return 0
+	end
+	return (wall - distance) / net
+end
+
+--- The slowest northward speed that gains any ground at all. Below this there is no escape, at any range.
+function StormFront.minEscapeSpeed(): number
+	return StormFront.ADVANCE_RATE / StormFront.GAIN_PER_STUD
+end
+
 function StormFront.intensity(): number
 	return math.floor(num(ATTR_INTENSITY, 0))
 end
@@ -126,7 +200,20 @@ end
 function StormFront.reset(distance: number?)
 	workspace:SetAttribute(ATTR_DISTANCE, distance or StormFront.START_DISTANCE)
 	workspace:SetAttribute(ATTR_SHELTERED, false)
-	workspace:SetAttribute(ATTR_LAST_POS, 0)
+	--[[
+		🔴 CLEAR the last position, do not zero it. Job 022, and it is a one-word difference that hands out
+		free distance.
+
+		`advance` reads `local last = num(ATTR_LAST_POS, vesselZ)` - so an ABSENT attribute falls back to the
+		vessel's current Z and the first tick correctly measures zero travel. Writing 0 instead makes the
+		first tick believe the vessel travelled its entire Z coordinate in one step: a hull 500 studs north
+		would be handed 500 x 1.6 = 800 studs of free cushion by the act of resetting the storm.
+
+		Latent until job 022. `vesselZ` never returned anything before it was fixed (finding 0020), so
+		`ATTR_LAST_POS` was written and never read. The moment the fix landed, every `reset` mid-run - which is
+		exactly what the admin panel's storm-distance tool does - became a distance cheat.
+	]]
+	workspace:SetAttribute(ATTR_LAST_POS, nil)
 	StormFront.apply()
 end
 
@@ -234,10 +321,18 @@ function StormFront.report(): string
 			StormFront.isSheltered() and "  [SHELTERED - closing at 30%]" or ""),
 		("intensity  %d  %s  -> sea %s"):format(band.intensity, band.label, band.sea),
 		("wind       %.2f"):format(StormFront.wind()),
+		("exposure   %.2f  (0 outside The Wall, 1 at distance %d)"):format(
+			StormFront.exposure(), StormFront.FULL_EXPOSURE_AT),
 		("rates      advance %.1f studs/s, gain %.1f per stud north"):format(
 			StormFront.ADVANCE_RATE, StormFront.GAIN_PER_STUD),
 		("net at 12 studs/s northward: %+.1f studs/s"):format(
 			12 * StormFront.GAIN_PER_STUD - StormFront.ADVANCE_RATE),
+		("min escape speed %.2f studs/s; escape from here at cruise 18: %s"):format(
+			StormFront.minEscapeSpeed(),
+			(function()
+				local t = StormFront.secondsToEscape(d, 18)
+				return if t then ("%.1f s"):format(t) else "never at this speed"
+			end)()),
 	}, "\n")
 end
 

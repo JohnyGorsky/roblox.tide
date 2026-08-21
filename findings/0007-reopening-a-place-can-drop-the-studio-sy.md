@@ -37,3 +37,28 @@ print(m and #m.Source or "absent")
 
 A mismatch or an absent instance means sync, not logic. Do this *before* debugging behaviour, because a
 stale module that loads and runs looks exactly like a logic bug.
+
+## Recurred 2026-08-21 (job 022), and a child-count check is NOT sufficient
+
+Happened again on the game place, and it fooled the detection I actually ran. I counted CHILDREN
+(`ReplicatedStorage` 16, `ServerScriptService` 4, `StarterPlayerScripts` 3), saw them match the files on
+disk, and called sync live. It was dead — and had been for the whole session. Four edited files and one
+brand-new module (`VesselDamage.luau`) were all undelivered.
+
+**Why the count matched anyway:** every instance was already in the saved `.rbxl` from the previous
+session. Child counts only prove that instances with those names exist, which the save guarantees. They say
+nothing about whether the *link* is alive.
+
+So the check must compare CONTENT, never inventory:
+
+```lua
+-- edited-file check: does the instance contain something only the new version has?
+local RS = game:GetService("ReplicatedStorage")
+print(RS.StormFront.Source:find("function StormFront.exposure") ~= nil)
+```
+
+A new file is the sharper probe of the two — an absent instance cannot be explained away by staleness — but
+only if the job actually adds one. When it does not, pick a distinctive string from a fresh edit.
+
+Corollary worth keeping: the handoff's "there should be 14 modules" style of note is a weak check for the
+same reason, and it also rots (14 was correct at job 019; job 021 made it 16). Content beats inventory.

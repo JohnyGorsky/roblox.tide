@@ -134,6 +134,14 @@ it affordable.
 - ~~What does being caught by the storm actually do?~~ **Decided:** escalating damage, escapable if the
   crew acts — decision [0014](../decisions/0014-storm-consequence.md). Tuning target is 30–60 seconds of
   survivability inside The Wall.
+  **Built in job 022** — decision [0023](../decisions/0023-storm-damage-model.md) records the model and
+  [systems/vessels/damage.md](../systems/vessels/damage.md) is the implementation map. Delivered: hull
+  integrity derived from a declared `survivability`, a four-rung fault ladder (radar → generator → engine
+  cut → breach), flooding that costs lift, capsize, a damage-control station, a self-lit helm compass, and
+  `Storm → Survival test` to measure the 30–60 s claim rather than guess at it. Lightning's fault rolls,
+  published and ignored since job 018, are now consumed. Radar and generator remain flags until there is a
+  radar to lose and a light to go out; vessel loss is a placeholder until the expedition end exists
+  (todo 0006). **None of it has run yet** — Studio Sync was down throughout (finding 0007).
 - ~~Is the storm distance visible as a number?~~ **Decided:** radar owns the number as a physical contact;
   the HUD only throws temporary threshold alerts — decision
   [0019](../decisions/0019-storm-advance-model.md). Note the arc this creates: radar dies inside The Wall,

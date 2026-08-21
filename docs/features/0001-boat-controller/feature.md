@@ -20,9 +20,13 @@ Implement the smallest production-worthy version of this system while preserving
 - [x] Fuel consumption — server-authoritative, burns at idle, 182 s at full ahead
 - [x] Wave response — four-point buoyancy on the wave field; boat/sea bob ratio steady 0.38-0.46, no energy gain
 - [x] Driver authority strategy — decision 0022: server-owned, plain station + input remote, no `VehicleSeat`
-- [ ] Set each player's `ReplicationFocus` to the vessel, not the character — the game place runs
-      with `StreamingEnabled = true` (job 004), so crew far from spawn will watch the deck stream out
-      without it
+- [x] Set each player's `ReplicationFocus` to the vessel, not the character — `focusOn` on `PlayerAdded`
+      and after every build/rebuild. Written in job 021; the checkbox was simply never ticked
+- [x] Damage, faults and loss — job 022, decision 0023. Hull integrity, a fault ladder, flooding that costs
+      lift, capsize, and a damage-control station on the aft deck. Vessel loss is a **placeholder** until the
+      end-of-expedition flow exists (todo 0006)
+- [x] A self-lit compass at the helm — a `SurfaceGui` binnacle on the console, required by decision 0014 so
+      The Wall is a navigation problem rather than a guess. Never a HUD readout, and nothing may ever fault it
 - [ ] Studio multiplayer verification — **still open**: driven and measured single-player only
 
 ## Verification rule

@@ -225,4 +225,90 @@ RunService.RenderStepped:Connect(function(dt)
 	push()
 end)
 
+-- ---------------------------------------------------------------------------
+-- The binnacle compass (job 022, decision 0014)
+-- ---------------------------------------------------------------------------
+
+--[[
+	Animate the compass card the server built into the helm console.
+
+	🔴 CLIENT-SIDE ON PURPOSE, and it is not a security hole.
+
+	The card has to move at frame rate to be readable in a sea that is throwing the hull around, and a
+	server-driven `Rotation` at 10 Hz would visibly step. Nothing is being trusted here: the client is reading
+	the hull's own replicated `CFrame` - which it already has, because the hull is a visible part - and turning
+	it into a picture. There is no state to falsify and nothing to gain by falsifying it.
+
+	Which also settles the question the removal of `VesselHeading` raised: this is why that attribute was not
+	needed. The information the compass shows is geometry the client can already see, exactly as a real
+	compass reads the vessel it is bolted to. What decision 0014 forbids is a HEADING ON THE SCREEN, and this
+	is a physical instrument on a part.
+
+	Found by TAG, never by path (finding 0020), so it survives `recoverIfLost` rebuilding the hull.
+]]
+local CollectionService = game:GetService("CollectionService")
+
+local COMPASS_TAG = "VesselCompassCard"
+
+--[[
+	⚠️ UNVERIFIED UNTIL MEASURED IN STUDIO. A `SurfaceGui` on the TOP face maps its 2D up-axis to one of the
+	part's horizontal directions, and which one is not worth deriving from first principles when a five-second
+	look at the running game answers it.
+
+	So the sign and the offset live here as named constants. If north reads 90 degrees out, change the offset;
+	if it turns the wrong way, flip the sign. Do not go hunting in the maths - the maths is
+	`rotation = sign * heading + offset` and nothing else.
+]]
+local COMPASS_SIGN = -1
+local COMPASS_OFFSET_DEG = 0
+
+--- Only animate for a crew member close enough to read it. A card spinning on an empty deck costs nothing
+--- useful, and this keeps the per-frame work out of every other client in a six-strong crew.
+local COMPASS_RANGE = 18
+
+local compassCards: { Frame } = {}
+
+local function trackCompass(instance: Instance)
+	if instance:IsA("Frame") then
+		table.insert(compassCards, instance)
+	end
+end
+
+for _, instance in ipairs(CollectionService:GetTagged(COMPASS_TAG)) do
+	trackCompass(instance)
+end
+CollectionService:GetInstanceAddedSignal(COMPASS_TAG):Connect(trackCompass)
+
+RunService.RenderStepped:Connect(function()
+	if #compassCards == 0 then
+		return
+	end
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local here = root and (root :: BasePart).Position or (workspace.CurrentCamera and workspace.CurrentCamera.CFrame.Position)
+	if not here then
+		return
+	end
+	for i = #compassCards, 1, -1 do
+		local card = compassCards[i]
+		if not card.Parent then
+			table.remove(compassCards, i) -- the hull was rebuilt; the tag signal will bring the new one
+		else
+			--[[
+				Walk UP to the hull rather than being told where it is: card -> bezel -> SurfaceGui -> console
+				-> model. `PrimaryPart` is the hull by construction (see `Vessel.build`), which is also why
+				that is set at all.
+			]]
+			local model = card:FindFirstAncestorOfClass("Model")
+			local hull = model and model.PrimaryPart
+			if hull and (hull.Position - here).Magnitude <= COMPASS_RANGE then
+				local forward = hull.CFrame.LookVector
+				-- 0 = +Z north, matching the wave field and the storm's bearing convention
+				local heading = math.deg(math.atan2(forward.X, forward.Z)) % 360
+				card.Rotation = COMPASS_SIGN * heading + COMPASS_OFFSET_DEG
+			end
+		end
+	end
+end)
+
 print("[HELM] client ready. Walk to the helm console, press E to take the helm, then W/S throttle and A/D steer.")

@@ -28,11 +28,14 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local CollectionService = game:GetService("CollectionService")
 
 local Vessel = require(ReplicatedStorage:WaitForChild("Vessel"))
 local VesselPhysics = require(ReplicatedStorage:WaitForChild("VesselPhysics"))
 local WaveField = require(ReplicatedStorage:WaitForChild("WaveField"))
 local SeaStates = require(ReplicatedStorage:WaitForChild("SeaStates"))
+local VesselDamage = require(ReplicatedStorage:WaitForChild("VesselDamage"))
+local StormFront = require(ReplicatedStorage:WaitForChild("StormFront"))
 
 local SPEC_ID = "StarterLaunch"
 
@@ -73,6 +76,24 @@ local state = {
 	steer = 0,
 	engineOn = true,
 	fuel = 0,
+	--[[
+		DAMAGE (job 022, decision 0014). All of it derived - see `VesselDamage`.
+
+		`faults` is what is wrong RIGHT NOW and can be repaired. `fired` is a separate record of which rungs
+		of the ladder have already gone off, and the two must not be merged: without `fired`, repairing a
+		breach while integrity is still below its threshold would re-break it on the very next frame, and
+		damage control would be a button that does nothing.
+	]]
+	integrity = 0,
+	integrityMax = 0,
+	flooding = 0,
+	faults = {} :: { [string]: boolean },
+	fired = {} :: { [string]: boolean },
+	engineCutUntil = 0,
+	capsizedFor = 0,
+	lost = false,
+	station = nil :: BasePart?,
+	repairing = false,
 }
 
 local remote = ReplicatedStorage:FindFirstChild("VesselInput")
@@ -84,6 +105,14 @@ end
 local input = remote :: RemoteEvent
 
 --[[
+	Clear a stale `VesselHeading` if one was ever saved into the place. Cheap, and it means the attribute
+	cannot survive as a leftover for a future HUD to find - see the note in `publish` and decision 0014.
+]]
+if workspace:GetAttribute("VesselHeading") ~= nil then
+	workspace:SetAttribute("VesselHeading", nil)
+end
+
+--[[
 	Publish to Workspace attributes, for the same reason every other system here does: the helm gauges, the
 	storm and the admin panel all read them, and attributes replicate without a bespoke remote each.
 ]]
@@ -93,13 +122,200 @@ local function publish()
 	workspace:SetAttribute("VesselFuelMax", state.spec and state.spec.fuelCapacity or 0)
 	workspace:SetAttribute("VesselEngineOn", state.engineOn)
 	workspace:SetAttribute("VesselThrottle", state.throttle)
+	--[[
+		DAMAGE STATE. Published because the crew is allowed to know the state of their own vessel - a hull
+		integrity gauge and a "BREACH" lamp are diegetic instruments (group 09), not the free heading readout
+		decision 0014 forbids. Knowing you are holed tells you nothing about which way is out.
+	]]
+	workspace:SetAttribute("VesselIntegrity", state.integrity)
+	workspace:SetAttribute("VesselIntegrityMax", state.integrityMax)
+	workspace:SetAttribute("VesselFlooding", state.flooding)
+	workspace:SetAttribute("VesselLost", state.lost)
+	for _, fault in ipairs(VesselDamage.LADDER) do
+		workspace:SetAttribute("VesselFault_" .. fault.id, state.faults[fault.id] == true)
+	end
+	workspace:SetAttribute("VesselFault_steering", state.faults.steering == true)
 	if hull then
 		local forward = hull.CFrame.LookVector
 		local vel = hull.AssemblyLinearVelocity
 		workspace:SetAttribute("VesselSpeed", vel:Dot(forward))
-		-- heading in degrees, 0 = +Z north, matching the wave field and the storm's bearing convention
-		workspace:SetAttribute("VesselHeading", math.deg(math.atan2(forward.X, forward.Z)) % 360)
+		--[[
+			🔴 HEADING IS NOT PUBLISHED. Removed in job 022; do not put it back.
+
+			It used to be here as `VesselHeading`, in degrees, and nothing read it. Workspace attributes
+			replicate, so the hull's heading was sitting on the wire waiting for the first HUD element that
+			wanted a cheap compass - and decision 0014 is explicit that inside The Wall *"the HUD must never
+			show a heading, or the blindness is free"*. The Wall's whole mechanic is that the crew steers by
+			the instrument on the console, not by a number on the screen.
+
+			Being straight about what this does and does not achieve: the hull is a replicated part, so any
+			client can read `hull.CFrame` and work out the heading regardless. This is a DESIGN rule, not a
+			secrecy mechanism - it removes the tempting shortcut, not the underlying information. The helm
+			compass reads the hull's own orientation for exactly that reason, which is also what a real
+			compass does.
+
+			Speed stays published. A speed readout does not tell you which way is out.
+		]]
 	end
+end
+
+-- ---------------------------------------------------------------------------
+-- DAMAGE (job 022, decision 0014)
+-- ---------------------------------------------------------------------------
+
+--[[
+	🔴 THE FAULT SIDE-EFFECTS LIVE IN ONE PLACE, AND NONE OF THEM MUTATE A DERIVED CONSTANT.
+
+	Steering damage is the temptation: the obvious implementation is `state.rudderAuthority *= 0.45`, and it
+	works perfectly until the fault is repaired, at which point the hull is permanently soft because the
+	original value is gone. Worse, `state.heelIn` was solved against that authority when the vessel was built,
+	so scaling it would quietly de-tune the heel as well.
+
+	So faults are FLAGS, read at the point of use, and every derived constant stays exactly as `buildVessel`
+	computed it. Nothing here is destructive, which is what makes repair possible at all.
+]]
+local function faultLabel(id: string): string
+	for _, f in ipairs(VesselDamage.LADDER) do
+		if f.id == id then
+			return f.label
+		end
+	end
+	return if id == "steering" then "Steering damaged" else id
+end
+
+local function applyFault(id: string)
+	state.faults[id] = true
+	if id == "engine" then
+		--[[
+			The engine cut is TRANSIENT - it relights on its own after `ENGINE_CUT_SECONDS`.
+
+			Deliberate, and it is the one rung that does not wait for damage control. A permanent engine loss
+			inside The Wall is not a consequence, it is a death sentence: with no thrust the crew cannot buy
+			any distance at all, so decision 0014's "escapable in 30-60 seconds" becomes unachievable by
+			definition. What the cut does instead is spend the crew's margin - eight seconds of the front
+			closing at 14 studs/s is 112 studs they now have to win back.
+		]]
+		state.engineCutUntil = os.clock() + VesselDamage.ENGINE_CUT_SECONDS
+	end
+	print(("[VESSEL] FAULT: %s"):format(faultLabel(id)))
+end
+
+--[[
+	Fire the ladder's rungs, once each, as integrity falls.
+
+	`fired` rather than `faults` is what gates this - see the note on the state table. A rung that has gone
+	off stays gone off for the run, so repairing a breach does not hand the storm a free second one.
+]]
+local function updateFaultLadder()
+	local lost = 1 - (state.integrity / math.max(state.integrityMax, 1))
+	for _, fault in ipairs(VesselDamage.faultsAt(lost)) do
+		if not state.fired[fault.id] then
+			state.fired[fault.id] = true
+			applyFault(fault.id)
+		end
+	end
+end
+
+--[[
+	🟡 VESSEL LOSS IS A PLACEHOLDER, AND SAYING SO IS THE POINT.
+
+	Decisions 0008 and 0011 settle what a crew KEEPS after a run - permanent progression is credited per
+	player, run power resets - but nothing implements an expedition end, and the lobby is a separate place
+	with no `TeleportService` flow built (todo 0006). So there is nothing correct to hand off to.
+
+	What happens instead: the engine dies, the helm is released, buoyancy stops and she goes down, and
+	`ExpeditionOver` is set for whatever eventually reads it. No progression is granted or taken, because
+	inventing progression rules inside a storm-damage job is how two systems end up disagreeing about what a
+	run is worth.
+
+	Do not build on this. Build the expedition end, then delete the placeholder.
+]]
+local function loseVessel(reason: string)
+	if state.lost then
+		return
+	end
+	state.lost = true
+	state.throttle, state.steer = 0, 0
+	state.engineOn = false
+	if state.driver then
+		state.driver = nil
+	end
+	if state.prompt then
+		state.prompt.Enabled = false
+	end
+	--[[
+		ZERO EVERY FORCE, ONCE, HERE - rather than letting `step` keep writing zeros.
+
+		Buoyancy included: the hull's density is 1.5 (see the spec), so with no lift she goes down on her own
+		weight and needs nothing simulating her descent. Killing the forces at the source also means `step`
+		can bail out immediately from now on, which is the difference between a wreck and a boat that is
+		still being driven at the bottom of the sea.
+	]]
+	for _, entry in ipairs(state.floats) do
+		entry.force.Force = Vector3.zero
+	end
+	if state.drive then state.drive.Force = Vector3.zero end
+	if state.grip then state.grip.Force = Vector3.zero end
+	if state.trim then state.trim.Torque = Vector3.zero end
+	if state.rudder then state.rudder.Torque = Vector3.zero end
+	if state.heel then state.heel.Torque = Vector3.zero end
+	workspace:SetAttribute("VesselDriver", "")
+	workspace:SetAttribute("ExpeditionOver", true)
+	workspace:SetAttribute("ExpeditionOverReason", reason)
+	local faults = {}
+	for id, on in pairs(state.faults) do
+		if on then
+			table.insert(faults, id)
+		end
+	end
+	table.sort(faults)
+	warn(("[VESSEL] 🔴 VESSEL LOST - %s. distance %.0f, flooding %.0f%%, faults: %s. "
+		.. "(Placeholder outcome: no expedition-end flow exists yet - todo 0006.)")
+		:format(reason, StormFront.distance(), state.flooding * 100,
+			#faults > 0 and table.concat(faults, ", ") or "none"))
+	publish()
+end
+
+--[[
+	DAMAGE CONTROL. One completed action clears the OLDEST outstanding fault and returns a slice of hull.
+
+	Oldest-first rather than a menu, because a menu at the worst moment of the game is a menu nobody reads -
+	and because the ladder's order already encodes what matters most. It also means a crew fighting a breach
+	has to work the station repeatedly rather than cherry-picking, which is what makes a second pair of hands
+	worth more than a bigger engine.
+
+	⚠️ FREE, for now. Group 03's repair kits give it a resource cost; this is the mechanism, not the economy.
+]]
+local FAULT_REPAIR_ORDER = { "breach", "steering", "generator", "radar" }
+
+local function repairOne(player: Player): (boolean, string)
+	if state.lost then
+		return false, "she is gone"
+	end
+	for _, id in ipairs(FAULT_REPAIR_ORDER) do
+		if state.faults[id] then
+			state.faults[id] = false
+			state.integrity = math.min(state.integrityMax,
+				state.integrity + state.integrityMax * VesselDamage.REPAIR_FRACTION)
+			print(("[VESSEL] %s repaired: %s (integrity %.0f/%.0f)"):format(
+				player.Name, faultLabel(id), state.integrity, state.integrityMax))
+			publish()
+			return true, faultLabel(id)
+		end
+	end
+	--[[
+		Nothing broken still returns integrity, at half rate. A crew that works the station while the storm
+		grinds at the hull should not be told "nothing to do here" - shoring up a sound hull is exactly what
+		damage control is, and it gives the second crew member something useful in the gap before the first
+		fault lands.
+	]]
+	if state.integrity < state.integrityMax then
+		state.integrity = math.min(state.integrityMax,
+			state.integrity + state.integrityMax * VesselDamage.REPAIR_FRACTION * 0.5)
+		publish()
+		return true, "shored up"
+	end
+	return false, "she is sound"
 end
 
 local function buildVessel()
@@ -158,6 +374,19 @@ local function buildVessel()
 	state.heelIn = (spec.heelInDeg * rollStiffnessPerDeg) / math.max(state.rudderAuthority, 1)
 	state.heelOut = (spec.heelOutDeg * rollStiffnessPerDeg) / math.max(spec.turnRate * spec.cruise, 0.01)
 	state.fuel = spec.fuelCapacity
+	--[[
+		DAMAGE, derived like everything else: the pool from the hull's own mass, the rate from the spec's
+		`survivability`. Reset on every build so a rebuilt hull is a sound one - a vessel that came back from
+		`recoverIfLost` still holed would be indistinguishable from a bug.
+	]]
+	state.integrityMax = VesselDamage.integrityFor(mass)
+	state.integrity = state.integrityMax
+	state.flooding = 0
+	state.faults = {}
+	state.fired = {}
+	state.engineCutUntil = 0
+	state.capsizedFor = 0
+	state.lost = false
 
 	local restingY = Vessel.restingY(spec, SeaStates.WATER_Y)
 	local model = Vessel.build(spec, CFrame.new(SPAWN_OFFSET + Vector3.new(0, restingY, 0)))
@@ -396,6 +625,145 @@ local function buildVessel()
 	state.prompt = prompt
 
 	--[[
+		🔴 THE COMPASS. The one instrument decision 0014 requires, and the only one nothing may ever break.
+
+		The storm doc is unambiguous: *"the compass cannot be destroyed, and nothing targets it"* — it is the
+		floor beneath pillar 6, the guarantee that being lost inside The Wall is always the crew's decision
+		rather than the dice's. So it takes no fault, is not on the ladder, and no future enemy or event may
+		acquire one. If threatening navigation ever looks tempting, threaten the CHART instead.
+
+		It is also what makes The Wall a navigation problem rather than a guess. Fog closes at 330 studs
+		against a black void sky, so every visual heading cue is gone; without a compass the crew cannot
+		deliberately steer north and decision 0014's 30-60 second escape is unmeasurable.
+
+		--------------------------------------------------------------------------------------------------
+		WHY IT IS A BINNACLE ON THE CONSOLE AND NOT A SCREEN
+
+		Decision 0014: *"the HUD must never show a heading, or the blindness is free."* A `SurfaceGui` on a
+		part is the difference — it is a physical object bolted to the vessel, readable only by a crew member
+		standing at the helm looking at it. The information is in the world, not on the player's screen.
+
+		TOP face, deliberately. A card lying flat is how a real binnacle reads, and it dodges the question of
+		which vertical face the driver happens to be standing at — which is not a settled question on this
+		hull (see finding 0021: the spec's forward labels are reversed relative to `LookVector`).
+
+		SELF-LIT via `LightInfluence = 0`: unaffected by lighting, so The Wall's brightness of 0.30 cannot
+		dim it. Decision 0014 spells that out too — indestructible is useless if unreadable.
+
+		The card is animated CLIENT-side (see `VesselClient`) and found by TAG rather than by path, because a
+		hardcoded instance path between two systems is exactly what finding 0020 was.
+	]]
+	--[[
+		Its own part, and not for decoration: the console's top face is 3 x 1.5 studs, so a round card drawn on
+		it would be stretched into a stadium shape. A `SurfaceGui` maps to the face it is on, so a compass that
+		is meant to read as a circle needs a SQUARE face to sit on.
+	]]
+	local binnacleBox = Instance.new("Part")
+	binnacleBox.Name = "Binnacle"
+	binnacleBox.Size = Vector3.new(1.8, 0.6, 1.8)
+	binnacleBox.CFrame = console.CFrame * CFrame.new(0, console.Size.Y * 0.5 + 0.3, 0)
+	binnacleBox.Anchored = false
+	binnacleBox.CanCollide = false
+	binnacleBox.Massless = true -- furniture must not shift the centre of mass; see the console's note
+	binnacleBox.Material = Enum.Material.Metal
+	binnacleBox.Color = Color3.fromRGB(46, 70, 88)
+	binnacleBox.Parent = model
+
+	local binnacleWeld = Instance.new("WeldConstraint")
+	binnacleWeld.Part0 = console
+	binnacleWeld.Part1 = binnacleBox
+	binnacleWeld.Parent = binnacleBox
+
+	local binnacle = Instance.new("SurfaceGui")
+	binnacle.Name = "Compass"
+	binnacle.Face = Enum.NormalId.Top
+	--[[
+		`LightInfluence = 0` is the self-lit requirement decision 0014 attaches to the compass: unaffected by
+		lighting, so The Wall's brightness of 0.30 cannot dim it. Indestructible is useless if unreadable.
+	]]
+	binnacle.LightInfluence = 0
+	binnacle.Brightness = 2
+	binnacle.PixelsPerStud = 120
+	binnacle.AlwaysOnTop = false
+	binnacle.Parent = binnacleBox
+
+	local bezel = Instance.new("Frame")
+	bezel.Name = "Bezel"
+	bezel.Size = UDim2.fromScale(1, 1)
+	bezel.BackgroundColor3 = Color3.fromRGB(11, 30, 45) -- Abyss, per the palette
+	bezel.BorderSizePixel = 0
+	bezel.Parent = binnacle
+
+	--[[
+		The CARD rotates; the lubber line does not. That is the whole mechanic of a compass and it has to be
+		this way round - a rotating needle over a fixed card tells you where north is, while a rotating card
+		under a fixed line tells you where YOU are pointing, which is the question a helmsman is asking.
+	]]
+	local card = Instance.new("Frame")
+	card.Name = "Card"
+	card.AnchorPoint = Vector2.new(0.5, 0.5)
+	card.Position = UDim2.fromScale(0.5, 0.5)
+	card.Size = UDim2.fromScale(0.86, 0.86)
+	card.BackgroundColor3 = Color3.fromRGB(20, 46, 62)
+	card.BorderSizePixel = 0
+	card.Parent = bezel
+	local cardCorner = Instance.new("UICorner")
+	cardCorner.CornerRadius = UDim.new(1, 0) -- a round card
+	cardCorner.Parent = card
+
+	--[[
+		Cardinal marks, placed by angle rather than by four hardcoded positions, so the ordinals can be added
+		later by extending the table rather than by working out corner coordinates again.
+
+		NORTH IS THE ONE THAT MATTERS. The storm chases from astern and progress is broadly northward, so on
+		this vessel the compass does not merely report a heading - it reports which way is AWAY. Hence north
+		gets the radar-green treatment and the rest are dimmed: the crew needs to find one mark in the dark,
+		fast, while being thrown about.
+	]]
+	local MARKS = {
+		{ text = "N", angle = 0, color = Color3.fromRGB(82, 255, 154), size = 0.30 },
+		{ text = "E", angle = 90, color = Color3.fromRGB(150, 175, 190), size = 0.20 },
+		{ text = "S", angle = 180, color = Color3.fromRGB(150, 175, 190), size = 0.20 },
+		{ text = "W", angle = 270, color = Color3.fromRGB(150, 175, 190), size = 0.20 },
+	}
+	for _, mark in ipairs(MARKS) do
+		local label = Instance.new("TextLabel")
+		label.Name = mark.text
+		label.AnchorPoint = Vector2.new(0.5, 0.5)
+		-- 0.36 of the card's radius out from centre, at the mark's own bearing
+		local rad = math.rad(mark.angle)
+		label.Position = UDim2.fromScale(0.5 + math.sin(rad) * 0.36, 0.5 - math.cos(rad) * 0.36)
+		label.Size = UDim2.fromScale(mark.size, mark.size)
+		label.BackgroundTransparency = 1
+		label.Font = Enum.Font.GothamBold
+		label.Text = mark.text
+		label.TextColor3 = mark.color
+		label.TextScaled = true
+		label.Rotation = mark.angle -- so each mark reads upright from the centre outwards
+		label.Parent = card
+	end
+
+	--[[
+		THE LUBBER LINE - fixed to the bezel, not the card. It is the vessel's own head, and the reading is
+		whatever the card has brought under it.
+	]]
+	local lubber = Instance.new("Frame")
+	lubber.Name = "LubberLine"
+	lubber.AnchorPoint = Vector2.new(0.5, 0)
+	lubber.Position = UDim2.fromScale(0.5, 0.02)
+	lubber.Size = UDim2.fromScale(0.03, 0.20)
+	lubber.BackgroundColor3 = Color3.fromRGB(226, 122, 63) -- Rust, per the palette: reads against the green
+	lubber.BorderSizePixel = 0
+	lubber.Parent = bezel
+
+	--[[
+		Tagged so the client can find it without knowing where the vessel lives in Workspace, and so it keeps
+		working after `recoverIfLost` rebuilds the hull - the tag arrives with the new instance and the
+		client's `GetInstanceAddedSignal` picks it up.
+	]]
+	CollectionService:AddTag(card, "VesselCompassCard")
+
+	--[[
 		Toggle: the same prompt takes and releases the helm, so there is never a state where the player is
 		steering and cannot work out how to stop.
 	]]
@@ -426,6 +794,61 @@ local function buildVessel()
 			state.driver = nil
 			state.throttle, state.steer = 0, 0
 			workspace:SetAttribute("VesselDriver", "")
+		end
+	end)
+
+
+	--[[
+		THE DAMAGE-CONTROL STATION. Built from the `station` socket, not from a magic offset.
+
+		Same pattern as the helm: a `ProximityPrompt` on a massless, non-colliding part welded to the hull.
+		Massless matters - a 3-stud box with real density bolted 11 studs aft and 4 to starboard would list
+		her, and a permanent list on a hull whose heel is tuned to fractions of a degree would read as a
+		physics bug rather than as furniture.
+
+		`HoldDuration` 3: long enough that it cannot be spammed through a storm, short enough to be worth
+		leaving the helm for. It is the whole crew-coordination mechanic in one number.
+	]]
+	local stationSocket = (hull:FindFirstChild("Sockets") :: Folder):FindFirstChild("damageControl") :: Attachment
+	local station = Instance.new("Part")
+	station.Name = "DamageControl"
+	station.Size = Vector3.new(2.5, 2.5, 2.5)
+	station.CFrame = hull.CFrame * CFrame.new(stationSocket.Position + Vector3.new(0, 1.25, 0))
+	station.Anchored = false
+	station.CanCollide = false
+	station.Massless = true
+	station.Material = Enum.Material.CorrodedMetal
+	station.Color = Color3.fromRGB(120, 78, 46)
+	station.Parent = model
+
+	local stationWeld = Instance.new("WeldConstraint")
+	stationWeld.Part0 = hull
+	stationWeld.Part1 = station
+	stationWeld.Parent = station
+
+	local repairPrompt = Instance.new("ProximityPrompt")
+	repairPrompt.Name = "DamageControl"
+	repairPrompt.ActionText = "Damage control"
+	repairPrompt.ObjectText = "Repair locker"
+	repairPrompt.HoldDuration = 3
+	repairPrompt.MaxActivationDistance = 10
+	repairPrompt.RequiresLineOfSight = false
+	repairPrompt.Parent = station
+	state.station = station
+
+	repairPrompt.Triggered:Connect(function(player)
+		--[[
+			Re-entrancy guard. The prompt can fire again while the previous call is still in `repairOne`, and
+			without this a held prompt on a laggy client could clear two faults for one action.
+		]]
+		if state.repairing then
+			return
+		end
+		state.repairing = true
+		local ok, what = repairOne(player)
+		state.repairing = false
+		if ok then
+			print(("[VESSEL] damage control: %s"):format(what))
 		end
 	end)
 
@@ -503,6 +926,27 @@ local function recoverIfLost(): boolean
 end
 
 local function step(dt: number)
+	--[[
+		SHE IS GONE. Nothing to simulate - `loseVessel` already zeroed every force.
+
+		🔴 This check must come BEFORE `recoverIfLost`, which exists to rebuild a hull the ENGINE removed
+		after a physics divergence. It cannot tell that apart from a hull we sank on purpose, so without this
+		ordering a lost vessel would be quietly replaced with a fresh one and the consequence decision 0014
+		exists to create would be free.
+	]]
+	if state.lost then
+		local hull = state.hull
+		if hull and hull.Parent and hull.Position.Y < SeaStates.WATER_Y - 200 then
+			-- stop a wreck falling forever; there is nothing down there to see
+			if state.model then
+				state.model:Destroy()
+			end
+			state.model, state.hull = nil, nil
+			state.floats = {}
+			print("[VESSEL] the wreck has gone below; hull removed")
+		end
+		return
+	end
 	if recoverIfLost() then
 		return
 	end
@@ -513,6 +957,53 @@ local function step(dt: number)
 	enforceOwnership(hull)
 
 	local now = workspace:GetServerTimeNow()
+
+	--[[
+		DAMAGE (job 022, decision 0014). Runs before the forces, so a hull that dies this frame stops being
+		driven this frame rather than one frame later.
+	]]
+	local exposure = StormFront.exposure()
+	if exposure > 0 then
+		state.integrity = math.max(0,
+			state.integrity - VesselDamage.damageRate(state.integrityMax, state.spec.survivability, exposure) * dt)
+		updateFaultLadder()
+	end
+
+	-- Flooding rises while a breach is open and pumps out slowly once it is closed. Never symmetric.
+	if state.faults.breach then
+		state.flooding = math.min(1, state.flooding + VesselDamage.FLOODING_RATE * dt)
+	elseif state.flooding > 0 then
+		state.flooding = math.max(0, state.flooding - VesselDamage.FLOODING_DRAIN_RATE * dt)
+	end
+
+	-- The engine relights by itself; see `applyFault`.
+	if state.faults.engine and os.clock() >= state.engineCutUntil then
+		state.faults.engine = false
+		print("[VESSEL] engine relit")
+	end
+
+	--[[
+		CAPSIZE - the second failure state, and the one job 021 explicitly left here.
+
+		Held for `CAPSIZE_SECONDS` rather than triggered instantly, because a Storm-state wave can throw her
+		past 100 degrees and she does come back from that. Four seconds still there means hydrostatics has
+		lost its lever for good.
+	]]
+	local tilt = VesselDamage.tiltDegrees(hull.CFrame.UpVector.Y)
+	if tilt > VesselDamage.CAPSIZE_DEGREES then
+		state.capsizedFor += dt
+		if state.capsizedFor >= VesselDamage.CAPSIZE_SECONDS then
+			loseVessel(("capsized - %.0f degrees held for %.1fs"):format(tilt, state.capsizedFor))
+			return
+		end
+	else
+		state.capsizedFor = 0
+	end
+
+	if state.integrity <= 0 then
+		loseVessel("hull integrity reached zero")
+		return
+	end
 
 	-- BUOYANCY: one force per point, each from its own submersion and its own vertical velocity.
 	local weight = hull:GetMass() * workspace.Gravity
@@ -533,6 +1024,15 @@ local function step(dt: number)
 			submersion = surface - worldPos.Y,
 			verticalVelocity = pointVelocity.Y,
 		}, state.stiffness, state.damping, state.maxDepth, weight, points)
+		--[[
+			FLOODING = LOST LIFT, applied AFTER the clamp on purpose.
+
+			The clamp is the divergence guard that stopped the hull destroying itself in job 021, and scaling
+			the result DOWN can never breach a ceiling. Doing it the other way round - reducing the stiffness
+			that feeds the clamp - would change a derived constant and put the equilibrium the whole kit is
+			solved for out by 35%.
+		]]
+		f *= VesselDamage.floodingLiftFactor(state.flooding)
 		entry.force.Force = Vector3.new(0, f, 0)
 	end
 
@@ -557,7 +1057,11 @@ local function step(dt: number)
 	local forward = hull.CFrame.LookVector
 	local forwardSpeed = hull.AssemblyLinearVelocity:Dot(forward)
 	local hasFuel = state.fuel > 0 and state.engineOn
-	local throttle = if hasFuel then state.throttle else 0
+	--[[
+		An engine cut removes THRUST, not fuel and not steering. She keeps her way on and still answers the
+		wheel, which is what makes the eight seconds survivable and frightening rather than simply fatal.
+	]]
+	local throttle = if hasFuel and not state.faults.engine then state.throttle else 0
 	local net = VesselPhysics.driveForce(throttle, forwardSpeed, state.spec.thrust, state.drag, state.linearDrag)
 	if state.drive then
 		--[[
@@ -647,7 +1151,14 @@ local function step(dt: number)
 	]]
 	local steer = if hasFuel then state.steer else 0
 	local yawRate = hull.AssemblyAngularVelocity.Y
-	local rudderT = VesselPhysics.rudderTorque(steer, forwardSpeed, state.spec.cruise, state.rudderAuthority)
+	--[[
+		Steering damage scales the authority HERE, at the point of use. See the note above `applyFault`:
+		mutating `state.rudderAuthority` would make the damage permanent and would silently de-tune the heel,
+		which was solved against the undamaged value when the vessel was built.
+	]]
+	local authority = state.rudderAuthority
+		* (if state.faults.steering then VesselDamage.STEERING_AUTHORITY else 1)
+	local rudderT = VesselPhysics.rudderTorque(steer, forwardSpeed, state.spec.cruise, authority)
 	local dampT = VesselPhysics.yawDamping(yawRate, forwardSpeed, state.spec.cruise, state.yawDamping)
 	if state.rudder then
 		--[[
@@ -760,6 +1271,44 @@ Players.PlayerAdded:Connect(function(player)
 	focusOn(player)
 end)
 
+--[[
+	CONSUME THE LIGHTNING FAULT.
+
+	`LightningServer` has rolled `radar` / `generator` / `lights` faults on close strikes since job 018 and
+	published them to `LightningFault`, and nothing has ever read them - the admin panel even says so out
+	loud: *"fault raised: radar (nothing consumes it yet)"*. Now that the vessel owns a fault set, it can.
+
+	Listening to `LightningFaultAt` rather than `LightningFault`: the timestamp changes on every strike, while
+	the fault NAME often repeats, and `GetAttributeChangedSignal` does not fire when a value is rewritten
+	unchanged. Watching the name would silently drop every second radar strike in a row.
+
+	`lights` maps to the generator, because the deck lighting is on the generator's circuit and there is no
+	lighting system yet to fault independently (build group 02). One fault id per thing that actually exists.
+
+	⚠️ Not `steering` - see todo 0005. Lightning's fault pool is job 018's tuning and adding a rung that
+	hampers escape belongs to whoever judges that balance, not to a wiring change.
+]]
+local LIGHTNING_FAULT_MAP: { [string]: string } = {
+	radar = "radar",
+	generator = "generator",
+	lights = "generator",
+}
+
+workspace:GetAttributeChangedSignal("LightningFaultAt"):Connect(function()
+	if state.lost then
+		return
+	end
+	local raised = workspace:GetAttribute("LightningFault")
+	local mapped = typeof(raised) == "string" and LIGHTNING_FAULT_MAP[raised] or nil
+	if not mapped or state.faults[mapped] then
+		return
+	end
+	state.fired[mapped] = true
+	applyFault(mapped)
+	print(("[VESSEL] lightning raised %s -> %s"):format(tostring(raised), mapped))
+	publish()
+end)
+
 buildVessel()
 for _, player in ipairs(Players:GetPlayers()) do
 	focusOn(player)
@@ -796,6 +1345,88 @@ _G.TideVessel = {
 		state.fuel = math.clamp(v, 0, state.spec and state.spec.fuelCapacity or 100)
 		state.engineOn = state.fuel > 0
 	end,
+	--[[
+		DAMAGE CONTROLS for the admin panel (job 022). Server-side, like everything else on this table.
+
+		`setIntegrity` deliberately does NOT fire the fault ladder. Dropping the hull to 20% to look at a
+		gauge should not also cut the engine and open a breach - the panel has a separate tool for inflicting
+		a named fault, and conflating the two makes both untestable in isolation. The ladder still fires
+		normally from storm exposure on the next frame if the integrity is genuinely low, which is correct:
+		the panel sets state, the storm causes events.
+	]]
+	setIntegrity = function(fraction: number)
+		state.integrity = math.clamp(fraction, 0, 1) * state.integrityMax
+		--[[
+			Mark every rung at or above the new level as already fired, so lowering integrity by hand does not
+			cause the ladder to go off all at once on the next frame. Raising it back up re-arms them.
+		]]
+		local lost = 1 - math.clamp(fraction, 0, 1)
+		for _, fault in ipairs(VesselDamage.LADDER) do
+			state.fired[fault.id] = lost >= fault.at
+		end
+		publish()
+	end,
+	inflict = function(id: string)
+		state.fired[id] = true
+		applyFault(id)
+		publish()
+	end,
+	repairAll = function()
+		state.faults = {}
+		state.flooding = 0
+		state.engineCutUntil = 0
+		state.integrity = state.integrityMax
+		--[[
+			Re-arm the ladder. Without this a repaired hull would never fault again for the rest of the run,
+			which turns one repair into permanent immunity.
+		]]
+		state.fired = {}
+		state.capsizedFor = 0
+		publish()
+	end,
+	damageReport = function(): string
+		local spec = state.spec
+		if not spec then
+			return "no vessel"
+		end
+		local exposure = StormFront.exposure()
+		local rate = VesselDamage.damageRate(state.integrityMax, spec.survivability, exposure)
+		local toLoss = VesselDamage.secondsToLoss(state.integrity, rate)
+		local speed = workspace:GetAttribute("VesselSpeed")
+		local escape = StormFront.secondsToEscape(StormFront.distance(), typeof(speed) == "number" and speed or 0)
+		local active = {}
+		for _, fault in ipairs(VesselDamage.LADDER) do
+			if state.faults[fault.id] then
+				table.insert(active, fault.label .. (fault.real and "" or " (stub)"))
+			end
+		end
+		if state.faults.steering then
+			table.insert(active, "Steering damaged")
+		end
+		local lines = {
+			("integrity   %.0f / %.0f  (%.0f%%)%s"):format(
+				state.integrity, state.integrityMax,
+				state.integrity / math.max(state.integrityMax, 1) * 100,
+				state.lost and "   🔴 VESSEL LOST" or ""),
+			("survivability %ds declared -> %.1f/s at full exposure"):format(
+				spec.survivability, VesselDamage.damageRate(state.integrityMax, spec.survivability, 1)),
+			("storm       distance %.0f, exposure %.2f -> %.1f integrity/s"):format(
+				StormFront.distance(), exposure, rate),
+			("time left   %s"):format(toLoss and ("%.1f s at this rate"):format(toLoss) or "not taking damage"),
+			("escape      %s  (min escape speed %.1f studs/s)"):format(
+				escape and ("%.1f s at the current %.1f studs/s"):format(escape,
+					typeof(speed) == "number" and speed or 0)
+					or "NOT GAINING GROUND at the current speed",
+				StormFront.minEscapeSpeed()),
+			("flooding    %.0f%%  -> lift x%.3f"):format(
+				state.flooding * 100, VesselDamage.floodingLiftFactor(state.flooding)),
+			("tilt        %.1f deg  (capsize past %d for %ds; held %.1fs)"):format(
+				state.hull and VesselDamage.tiltDegrees(state.hull.CFrame.UpVector.Y) or 0,
+				VesselDamage.CAPSIZE_DEGREES, VesselDamage.CAPSIZE_SECONDS, state.capsizedFor),
+			("faults      %s"):format(#active > 0 and table.concat(active, ", ") or "none"),
+		}
+		return table.concat(lines, "\n")
+	end,
 	report = function(): string
 		local hull = state.hull
 		if not hull then
@@ -819,6 +1450,9 @@ _G.TideVessel = {
 				state.throttle, state.steer, state.fuel, spec.fuelCapacity, tostring(state.engineOn)),
 			("owner %s (must be nil)"):format(tostring(hull:GetNetworkOwner())),
 			("driver %s"):format(state.driver and state.driver.Name or "nobody at the helm"),
+			("integrity %.0f/%.0f  flooding %.0f%%  exposure %.2f%s"):format(
+				state.integrity, state.integrityMax, state.flooding * 100, StormFront.exposure(),
+				state.lost and "   🔴 LOST" or ""),
 			("tilt %.1f deg from level"):format(math.deg(math.acos(math.clamp(hull.CFrame.UpVector.Y, -1, 1)))),
 		}
 		return table.concat(lines, "\n")

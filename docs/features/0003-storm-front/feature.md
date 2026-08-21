@@ -20,7 +20,9 @@ Implement the smallest production-worthy version of this system while preserving
       2026-08-20** after four attempts; see the job summary for why the first three failed
 - [x] Rain/wind/lightning layers — `StormVFX`, `Lightning`/`LightningVFX`, `StormAudio` (wind live; rain
       and thunder clips still unsourced), job 018
-- [ ] Danger when caught — no damage model yet; The Wall currently only *looks* unsurvivable
+- [x] Danger when caught — `VesselDamage` + `VesselServer`, job 022, decision 0023. Escalating hull
+      damage inside The Wall, a four-rung fault ladder, flooding, capsize, and a damage-control station.
+      **Measured, not judged:** `Storm -> Survival test`. Not yet run in a session — see the status note
 - [x] Server authoritative storm progression — `WorldTick` at 1 Hz, fixed order, job 017
 - [x] Client-only expensive visuals — every emitter is camera-local; the server publishes numbers only
 
@@ -53,10 +55,20 @@ Two safety properties, both verified numerically in job 018 and both worth re-ch
 Approved by eye for the POC on 2026-08-20: the approach reads, the wall grows and engulfs, lightning lights
 the sea at range, and the audio bed does not loop audibly. Everything sensory is done.
 
-It is **not** VERIFIED because one requirement is genuinely unbuilt: **the storm cannot hurt you.** The Wall
-looks unsurvivable and does nothing at all. Decision 0014 puts damage at escapable-in-30-60s. Until that
-exists the storm is a spectacle rather than a threat, and the macro loop decision 0007 describes does not
-close.
+**The teeth are now built** (job 022). The Wall inflicts escalating hull damage, fires a designed fault
+ladder, floods her, can capsize her and can lose the vessel — and lightning's fault rolls, which had been
+published and ignored since job 018, are finally consumed. Decision 0023 records the model.
+
+It is still **not** VERIFIED, for a different reason than before: **none of it has ticked.** Studio Sync was
+down for the whole of job 022 (finding 0007), so the damage model is analyzer-clean and its arithmetic is
+checked against the storm's own constants, but no line of it has run. The one thing that would settle it is
+`Storm -> Survival test`, which measures both halves of decision 0014's claim — that staying is fatal on a
+known clock, and that leaving works if you leave now.
+
+Second open item: the storm's forward pressure had **never actually worked**. `WorldTick.vesselZ()` looked for
+an instance path that never existed, so `GAIN_PER_STUD` was never applied and distance could only decrease —
+outrunning the front was not hard, it was impossible (finding 0020). Fixed in job 022, and it needs the same
+session to confirm.
 
 ## Still open
 
