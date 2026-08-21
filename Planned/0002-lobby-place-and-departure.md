@@ -57,6 +57,9 @@ measurable from a probe the way job 022 was, and it is where the run's substance
 - the lobby half of the split summary: job 023 ships the in-place beat, this reads the result out of
   `TeleportData` and shows the breakdown
 - failure handling both ways — a crew that cannot get home must not be stranded in a dead reserved server
+- **the in-transit teleport screen** — todo 0009. `TeleportService:SetTeleportGui`, and the engine re-parents
+  that GUI into the *destination's* loading context, so it must be entirely self-contained: no requires, no
+  dependence on anything in the place it was built in. Without it the departure is a black gap
 
 **Place settings**
 

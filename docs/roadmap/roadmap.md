@@ -20,6 +20,12 @@
 - POI contacts
 - simple nautical chart
 - logical sea progression
+- **intro loading screen, per place** — todo 0009. Removes Roblox's default screen, preloads behind a
+  progress bar, and holds for a beat *after* preload so texture streaming and lighting resolve behind it
+  rather than popping in front of the player
+- **in-transit teleport screen** — todo 0009. `TeleportService:SetTeleportGui`. The departure flow is a
+  reserved-server teleport (Planned 0002), and a teleport with no screen is a black gap. Copy the shape from
+  the Jungle game, which has both halves already
 
 ## Stage 4 — Time/weather
 - day/dusk/night
