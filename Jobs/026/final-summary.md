@@ -122,6 +122,41 @@ Readouts | 0.90 km · 01:04 · STORM · 64% — arrival matches `900 / 14` |
 - [x] Legend fits; readouts correct
 - [x] Approved by the user by eye
 - [x] No new analyzer diagnostics; 18 shared files identical; Play stopped; Studio in Edit
-- [ ] **Sounds have never been heard in place** — they were auditioned through the storm's `thunder` slot, not
-      through the radar's own positional emitters
+- [x] **Sounds heard in place, and two were rejected.** See below — the mechanism is verified, the clips are not
+      final
 - [ ] Never seen on a phone (todo 0003 territory)
+
+## Post-summary: the sounds were wrong, and so was the ping rate
+
+Two faults found after this summary was first written, both by the user hearing the thing rather than reading it.
+
+**The sweep clips are interference textures, not pings.** `9126138070` and `9126138068` are Pro Sound Effects
+*"Transmission Breakup, Sonar or Tracker Tones, **Stutter, Pause**, Normal Communication, **Interference**"*.
+I read "Sonar or Tracker Tones" and stopped — the audio registry's own standing warning is *"READ THE
+DESCRIPTION, NOT JUST THE CATEGORY"*, and this is a textbook case of ignoring it. They read as random noise at
+the console.
+
+The audition harness made it worse: candidates were judged through the storm's `thunder` slot, which plays at
+the volume of thunder 600 studs away — too quiet and distant to tell a ping from a texture. **Fixed by
+building the right harness**: `Radar → Try a sound id` swaps a candidate into the radar's own positional
+emitter, so it is heard where it will actually live. `radar_contact` (`75886285262316`, an actual ping)
+survives; the two sweep slots are awaiting a replacement.
+
+**The ping fired per contact, not per sweep.** Six contacts at six bearings meant six pings in one revolution,
+plus more from anything near the range edge flickering off-scope and re-acquiring — the user counted about ten.
+Now capped by **revolution index**, taken from the same server clock that drives the beam so the cap cannot
+drift out of step with the sweep it caps. `seen` is marked whether or not a ping plays, or unpinged contacts
+would trickle one ping per revolution for as many revolutions as there are contacts.
+
+Measured: **25 acquisitions over ~20 s produced 4 pings, never more than one in any single revolution.**
+
+Two of my own test assertions were wrong before the code was, which is worth recording:
+
+1. The first cap test moved existing contacts out of range and back, got **0 pings, and nearly passed**. It was
+   inconclusive — the barrels are repositioned every frame by `TenderServer`, so the client-side moves were
+   overwritten and nothing re-acquired.
+2. The second gave 2 pings and I called it a burst. **2 over 2 revolutions is one per circle** — compliant.
+   Contacts created mid-sweep, at bearings the beam has already passed, wait for the next pass.
+
+The rule is now tested as stated — never more than one within a single revolution — rather than against a total
+over an arbitrary window.
