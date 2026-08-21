@@ -2,7 +2,7 @@
 
 **Project**: `roblox.tide`
 **Created**: 2026-08-21 23:05:24
-**Status**: Requirements Gathering (intake)
+**Status**: ✅ Complete — see [final-summary.md](final-summary.md)
 
 ## Requirements / goal
 
@@ -56,7 +56,10 @@ ORIGINAL REQUEST, kept for the record - one sound, and a searchable spec: a rada
 
 ## Checklist
 
-- [ ] Requirements reviewed (this intake)
-- [ ] Implementation plan created & agreed
-- [ ] Implementation completed
-- [ ] Final summary + changelog written
+- [x] Requirements reviewed (this intake)
+- [x] Implementation plan created & agreed
+- [x] Implementation completed
+- [x] Verified in a session — 44/45 maths checks first run, sweep gating measured, head-up confirmed from the
+      server, both dead states reachable
+- [x] Approved by the user by eye
+- [x] Final summary + changelog written

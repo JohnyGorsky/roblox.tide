@@ -318,3 +318,29 @@ assets:
     jitter. Nothing about a barrel needs simulating - it needs to look like it is bobbing and to be reachable.
     The 200-400 band is decision 0024's cost table: a round trip at the tender's 6 studs/s costs 22-44% of the
     storm's 4200-stud cushion. Keep that band when replacing them; the distance IS the mechanic.
+- id: GB-RADAR-STATION
+  type: graybox
+  status: GRAYBOX
+  source: studio
+  represents: ASSET-RADAR-MK1
+  place: game
+  roblox_path: Workspace.<vessel>.RadarConsole + .RadarPedestal + .RadarAerial + .RadarMast (runtime-built)
+  feature: GAME-0002
+  notes: >-
+    The radar station, built at run time by RadarServer (job 026). Four boxes: a 4 x 2.8 x 0.3 screen on a
+    2.4 x 2.2 x 1.6 pedestal at the radarConsole socket, and a 4.5-stud aerial bar on a mast at the radar
+    socket. Runtime-built, so an Edit-mode graybox audit reports it as runtime-only.
+    WHAT MUST SURVIVE A REPLACEMENT, because these are decisions rather than styling:
+    (1) The screen is VERTICAL and its facing is set by rotating the part so its own LookVector points aft -
+    a text-bearing SurfaceGui on a Top face comes out sideways, because a top face maps its up-axis to one of
+    the part's horizontal axes. The compass gets away with a top face only because a compass card is
+    rotationally symmetric.
+    (2) The face carrying the scope must be able to hold a SQUARE dial, or the circle becomes an ellipse and
+    every bearing drawn on it is a lie.
+    (3) Self-lit, LightInfluence 0 - the legend and the failure message must be readable at The Wall's
+    brightness of 0.30 even though the radar is dead there.
+    (4) The console stays AWAY from the helm. The distance is the mechanic: watching the radar has to be a job
+    somebody takes rather than something the driver does with a glance.
+    (5) The aerial is ANCHORED and repositioned each frame, not welded and spun. Spinning a part welded into a
+    moving physics assembly fights the solver, which is how job 021 lost a hull.
+    Positions are provisional - the user places all instruments once the real hull exists.

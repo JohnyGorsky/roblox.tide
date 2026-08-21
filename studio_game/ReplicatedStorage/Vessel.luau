@@ -326,6 +326,22 @@ local STARTER_LAUNCH: Spec = {
 			bigger engine.
 		]]
 		damageControl = { kind = "station", offset = Vector3.new(4, 2.5, -11) },
+		--[[
+			The radar CONSOLE, which is not the same thing as the `radar` socket above.
+
+			That one is at y=6 - three and a half studs above the deck, too high to read a display and exactly
+			the right height for a SCANNER. So the aerial goes there and the console goes here, at deck level,
+			which is also how a real bridge is arranged: the array is on the mast, the display is at the
+			station.
+
+			Port side, a few studs abaft the helm at (0, 2.5, 8). Deliberately NOT at the helm: the whole point
+			of the instrument is that someone has to stand and watch it (job 026), so it has to be far enough
+			that one person cannot comfortably drive and watch. Same reasoning as the damage-control locker.
+
+			Provisional like every offset in this table - see the note above. The user will position all
+			instruments once the real hull exists.
+		]]
+		radarConsole = { kind = "station", offset = Vector3.new(-4.5, 2.5, 2) },
 	},
 }
 

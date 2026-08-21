@@ -828,6 +828,58 @@ local function expedition()
 	return (_G :: any).TideExpedition
 end
 
+--[[
+	RADAR (job 026). Server-side, because `_G.TideRadar` only exists there.
+
+	Two tools, and the second is the one that matters: the radar's DEAD state is the hardest thing to see by
+	accident, because reaching it honestly means either sailing into The Wall or waiting for lightning to roll
+	the fault. An instrument that fails invisibly is the whole risk this feature carries - a blank scope reads
+	as "nothing out there" - so being able to break it on demand is how that gets checked.
+]]
+local function radar()
+	return (_G :: any).TideRadar
+end
+
+tools.radarStatus = {
+	id = "radarStatus",
+	label = "Radar status",
+	section = "Radar",
+	scope = "local",
+	controls = { kind = "button", output = "text" },
+	run = function(_player: Player, _args: any)
+		local R = radar()
+		if not R then return false, "no radar - is the game in Play?" end
+		return true, R.report()
+	end,
+}
+
+tools.radarBreak = {
+	id = "radarBreak",
+	label = "Break / repair the radar",
+	section = "Radar",
+	scope = "global",
+	controls = { kind = "choice", options = { "break it", "repair it" } },
+	run = function(_player: Player, args: any)
+		local V = vessel()
+		if not V then return false, "no vessel - is the game in Play?" end
+		local choice = tostring(args and args.value)
+		if choice == "break it" then
+			V.inflict("radar")
+			return true, "radar fault inflicted. The scope should now read RADAR FAULT and stop sweeping -"
+				.. " visibly broken, not merely empty. Job 022 published this fault and nothing consumed it"
+				.. " until now."
+		elseif choice == "repair it" then
+			--[[
+				Clears just this fault rather than calling `repairAll`, so a run being tested for something
+				else does not get its hull and its other faults quietly reset as a side effect.
+			]]
+			V.state.faults.radar = false
+			return true, "radar repaired. The other faults and the hull are untouched."
+		end
+		return false, "unknown choice"
+	end,
+}
+
 tools.expeditionReport = {
 	id = "expeditionReport",
 	label = "Run status",
@@ -1695,7 +1747,7 @@ function AdminTools.manifest(): { any }
 		A section not listed here falls to the end alphabetically, so adding one never breaks the sort - it
 		just does not get a considered position until someone gives it one.
 	]]
-	local SECTION_ORDER = { Expedition = 1, Vessel = 2, Storm = 3, Weather = 4, Sea = 5, Audio = 6, Diagnostics = 7 }
+	local SECTION_ORDER = { Expedition = 1, Radar = 2, Vessel = 3, Storm = 4, Weather = 5, Sea = 6, Audio = 7, Diagnostics = 8 }
 	table.sort(list, function(a, b)
 		if a.section == b.section then
 			return a.label < b.label

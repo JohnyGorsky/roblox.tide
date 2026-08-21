@@ -2,9 +2,9 @@
 id: GAME-0002
 name: Radar Mk1
 area: navigation
-status: PLANNED
+status: IMPLEMENTED
 priority: P0
-last_verified: null
+last_verified: 2026-08-21
 ---
 
 # Radar Mk1
@@ -15,12 +15,16 @@ Implement the smallest production-worthy version of this system while preserving
 
 ## Requirements
 
-- [ ] Physical radar station
-- [ ] Nearby generic POI contacts
-- [ ] Range limit
-- [ ] Storm contact
-- [ ] No permanent minimap
-- [ ] Studio verification
+- [x] Physical radar station — a vertical screen on its own `radarConsole` socket, away from the helm, plus a
+      turning aerial on the `radar` socket. Job 026
+- [x] Nearby generic POI contacts — discovered by the `RadarContact` tag. Six real contacts today (start
+      island, four barrels, the tender); group 04's islands only have to tag themselves
+- [x] Range limit — 1,800 studs from one constant, with an **uncertain band** at 1,080–1,800 that draws
+      hollow amber circles instead of fixes
+- [x] Storm contact — astern-relative, appearing once the front closes to 1,800 and swelling as it nears
+- [x] No permanent minimap — nothing is on screen; the scope is a `SurfaceGui` on a part
+- [x] Studio verification — sweep gating, head-up transform, both dead states and the maths all measured
+- [ ] Skills change the range — the hook exists (`Radar.RANGE`); progression does not (decisions 0008, 0012)
 
 ## The design, as specified 2026-08-21
 

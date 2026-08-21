@@ -64,6 +64,12 @@ local REGISTERED: { [string]: { represents: string, place: string, path: string,
 		path = "Workspace.FuelBarrel (x4)",
 		runtime = true, -- built by TenderServer
 	},
+	["GB-RADAR-STATION"] = {
+		represents = "ASSET-RADAR-MK1",
+		place = "game",
+		path = "Workspace.<vessel>.RadarConsole / .RadarAerial",
+		runtime = true, -- built by RadarServer
+	},
 	["GB-STARTER-LAUNCH"] = {
 		represents = "ASSET-BOAT-STARTER",
 		place = "game",
