@@ -10,7 +10,7 @@ The game reads flat and clipped next to comparable Roblox sea games. Four concre
 
 1. NO DEPTH / CLIPPED DISTANCE. Lighting.FogEnd is 2353 live (DeadCalm caps at 2900). Reference games keep islands readable as pale silhouettes several thousand studs out - atmospheric perspective, not an erase. Our fog deletes everything past ~2.3k, so the world has no depth and no sense of scale.
 
-2. THE OCEAN HAS A VISIBLE EDGE ASTERN. Measured: water runs Z -1000..5500, so from the launch at Z=0 the south edge is 1000 studs away while fog reaches 2353. SeaStates.validateFogWithinOcean() reports OK because it compares fogEnd against OCEAN_HALF_EXTENT - a SQUARE-ocean test written before decision 0025 made the ocean an asymmetric corridor. It cannot see the south edge at all. Confirmed empirically: water at Z=-1600 yes, X=3100 no.
+2. [CORRECTED - NOT A REAL FAULT, see the plan] THE OCEAN HAS A VISIBLE EDGE ASTERN. Measured: water runs Z -1000..5500, so from the launch at Z=0 the south edge is 1000 studs away while fog reaches 2353. SeaStates.validateFogWithinOcean() reports OK because it compares fogEnd against OCEAN_HALF_EXTENT - a SQUARE-ocean test written before decision 0025 made the ocean an asymmetric corridor. It cannot see the south edge at all. Confirmed empirically: water at Z=-1600 yes, X=3100 no.
 
 3. THE SEA APPEARS AS YOU MOVE. StreamingEnabled is true in the game place. StreamingTargetRadius / StreamingMinRadius / StreamingIntegrityMode are NOT script-readable (not valid members from a script context), so the radius is unmeasured - the default is 1024, which is well inside FogEnd, so terrain would pop in inside the visible range. Needs verifying in the Properties panel.
 

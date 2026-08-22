@@ -69,7 +69,13 @@ end
 SkyLibrary.Skies = {
 	SunlessBlue = def({
 		id = "SunlessBlue",
-		label = "Sunless Blue",
+		--[[
+			⚠️ THE ID IS NOW A LIE and is kept anyway. Job 028 gave this sky a sun, so "Sunless" is wrong -
+			but the id is referenced by DayNight (3 places), SeaStates and the admin panel, mirrored across
+			both places. Renaming is pure identifier churn for no visual gain; see the follow-up todo.
+			The LABEL is what a human reads, so that is what got corrected.
+		]]
+		label = "Clear Blue (sun)",
 		up = "rbxassetid://591059642",
 		dn = "rbxassetid://591059876",
 		ft = "rbxassetid://591058104",
@@ -77,7 +83,9 @@ SkyLibrary.Skies = {
 		lf = "rbxassetid://591057861",
 		rt = "rbxassetid://591057625",
 		source = "Creator Store, free — Yourius, asset 591067775",
-		intent = "Calm cold day. No sun disc: the original had celestial bodies on, turned off here.",
+		intent = "Clear blue sky with a sun. Carries the fair half of the ladder - Dead Calm's blazing"
+			.. " doldrums and Light Swell's good working day, told apart by cloud cover and grade rather"
+			.. " than by the skybox. Was sunless until job 028.",
 	}),
 
 	SnowGrey = def({

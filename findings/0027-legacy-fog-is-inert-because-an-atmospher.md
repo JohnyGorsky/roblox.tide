@@ -9,3 +9,17 @@
 **Where:** SeaStates.luau sky.fogEnd for all 5 states, validateFogWithinOcean, validateCorridorForTarget, Radar.visibility, decision 0025
 **Repro / notes:** _TODO_
 **Fix idea:** _TODO_
+
+
+## Correction (2026-08-22)
+
+Consequence (3) originally added *"which is why the ocean's south edge is visible"*. **That clause was
+wrong.** I took the south edge to be 1,000 studs away by reading `OCEAN_EXTENT_Z.min` rather than measuring
+the water. Measured, the fill reaches `Z = -3070` — three times further — and the horizon reads clean looking
+south from 150 studs up in Dead Calm.
+
+The rest of the finding stands unchanged: fog is inert, and every invariant expressed in `fogEnd` is
+therefore meaningless. It simply was not concealing anything that needed concealing.
+
+A separate, smaller defect came out of the same measurement: `OCEAN_EXTENT_Z.min` under-reports the real
+fill by 2,070 studs and `insideOcean()` is built on it, so callers believe the ocean is smaller than it is.

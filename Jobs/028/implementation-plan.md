@@ -2,7 +2,43 @@
 
 **Project**: `roblox.tide`
 **Created**: 2026-08-22
-**Status**: Planned — direction settled with the user. Awaiting one measurement (`StreamingTargetRadius`) and go-ahead.
+**Status**: **Partly built.** The grade, the sun, the clouds and the exposure ladder are in and measured.
+Steps 1, 3 and 8 remain.
+
+| Step | State |
+|---|---|
+1. Make visibility honest (retire `fogEnd`) | ❌ not started |
+2. The world edge | ✅ **not a fault** — I measured wrong; the constant fix remains |
+3. Streaming | ⏸ blocked on your Properties-panel read |
+4. Sun back on the fair states | ✅ done, per-state and blended so it fades rather than pops |
+5. Per-state `ColorCorrectionEffect` | ✅ done — created from nothing, none existed |
+6. Fix the inert levers | ✅ Glare, Bloom threshold, Offset, **ExposureCompensation**. `DepthOfField` still left misconfigured |
+7. Drive the clouds from severity | ✅ done, `Cover` 0.08 → 1.00 |
+8. Docs | ❌ not started |
+
+### 🔴 The lever that actually rescued the storm: `ExposureCompensation`
+
+Not in the original plan, and worth recording. Storm went **black** once cover-0.78 clouds and contrast
+landed on it, and it survived three rounds of raising `Brightness`, ambient, reflectance and water colour.
+An isolation test ruled the clouds out — cover 0.78 → 0.20 changed the sea *not at all*.
+
+The reason is physical: **`Brightness` is the SUN**, and Storm has no sun disc, so it was pushing on a lever
+that was not connected. An overcast is lit by the whole sky as diffuse ambient with almost no directional
+component — so ambient goes UP past Dead Calm's, brightness comes DOWN, and `ExposureCompensation` (sitting
+at −0.05, driven by nothing) does the real work of giving a dark scene tonal range instead of crushing it.
+
+### The ladder, as measured
+
+| State | Water luminance | Light warmth | Saturation | Sun | Exposure | Cloud |
+|---|---|---|---|---|---|---|
+DeadCalm | 0.118 | +50 | +0.12 | 21 | −0.05 | 0.08 |
+LightSwell | 0.085 | +33 | +0.07 | 17 | 0.00 | 0.22 |
+Choppy | 0.048 | −10 | −0.10 | 7 | +0.25 | 0.55 |
+Storm | 0.026 | −25 | −0.28 | 0 | +0.85 | 0.78 |
+The Wall | 0.007 | −32 | −0.55 | 0 | +0.40 | 1.00 |
+
+**All six axes verified monotonic** by a script, not by eye — which caught two reversals no eye would have
+found in a near-black scene: The Wall's *light* and its *air* were both coming back warmer than Storm's.
 
 Sea, lighting and atmosphere quality pass. Everything below was **measured**, not eyeballed.
 
@@ -32,14 +68,28 @@ What that invalidates:
 `density 0.30 → 0.85`, `offset 0.25 → 0.10` across the ladder. So the storm genuinely does blind you. The
 blinding is real; the *numbers we reason with* are fiction.
 
-### 2. 🔴 The ocean has a visible edge, and nothing was ever concealing it
+### 2. ~~The ocean has a visible edge~~ — **I got this wrong. Corrected.**
 
-Measured: water runs `Z −1000 … 5500`, so from the launch at `Z=0` the **south edge is 1,000 studs away**.
-Water at `Z=−1600` reads empty; at `X=3100` empty. On a clear day you see far past 1,000 studs.
+I claimed the south edge sat 1,000 studs from spawn and was therefore visible. That came from reading
+`SeaStates.OCEAN_EXTENT_Z.min = -1000` **instead of measuring the water** — the exact mistake the terrain
+skill warns about.
 
-This is finding 0018 reappearing at the other end. Decision 0025 only ever constrained the **north** edge
-(`max ≥ target + fogEnd`), and `validateFogWithinOcean` tests `fogEnd < OCEAN_HALF_EXTENT` — a **square-ocean
-test written before 0025 made the ocean an asymmetric corridor.** It cannot see the south edge at all.
+Measured properly, by walking outward until the liquid channel empties and then bisecting:
+
+| Direction | Last water | Distance from the launch |
+|---|---|---|
+south (−Z) | `Z = −3070` | **3,070** |
+north (+Z) | `Z = 5502` | 5,502 |
+east (+X) | `X = 3074` | 3,004 |
+west (−X) | `X = −3070` | 3,140 |
+
+So the real south edge is **3× further out than the constant says**, comfortably past anything you can see,
+and screenshots confirm it: the horizon reads clean looking south from 150 studs up in Dead Calm — the
+longest sightline in the game. **There was never a visible edge. No work needed here.**
+
+**The real defect is smaller and different:** `OCEAN_EXTENT_Z.min` under-reports the actual fill by 2,070
+studs, and `insideOcean()` is built on it — so every caller believes the world ends at `Z = −1000` when
+there is water to `−3070`. Wrong in the safe direction today, but it is a constant that lies.
 
 ### 3. The sea "appears" as you move — streaming, unmeasured
 
@@ -149,9 +199,9 @@ Steps 1–3 and 5–8 are unconditional. Step 4 needs the decision below.
      the Atmosphere degrades to "no fog" instead of a hard clip at 2.3 km.
    - Rewrite `validateFogWithinOcean` → `validateVisibilityWithinOcean`, asserting against **both** Z ends and
      both X sides of the **corridor**, not a square half-extent.
-2. **Close the world edge.** Extend the ocean south from `Z=−1000` to about `−3000` so the calmest state's
-   sight line cannot reach it, and re-check the north end against the corrected invariant. Cost is a one-time
-   `FillRegion`; job 007 measured ~0.68 s for 36 tiles.
+2. **Fix the lying constant.** No terrain work — the water is already at `Z=−3070`. Correct
+   `OCEAN_EXTENT_Z.min` to the measured value and add an assertion that the constants match the actual fill,
+   so the next person to reason from them is not misled the way I was.
 3. **Streaming**: you read `StreamingTargetRadius` in the Properties panel, I add it to the settings-baseline
    spec's human-click section and to the audit. If it is 1,024, raise it past the visible range.
 4. **Put the sun back on the fair states.** `SkyLibrary` already has the fields (`sunSize`, `moonSize`,

@@ -74,6 +74,70 @@ export type AtmosphereSpec = {
 	decay: Color3,
 }
 
+--[[
+	THE GRADE: everything about the FINAL IMAGE rather than the world.
+
+	This block is why the ladder reads as a journey instead of five unrelated looks. Job 028's direction is
+	that a normal day is warm and sunny and the storm takes that away - so warmth, saturation and light all
+	drain together as severity climbs, and the front's approach becomes legible on the water itself.
+
+	🔴 Why each of these exists, because five of them were dead before this job:
+	  * `saturation`/`contrast`/`tint` - there was NO ColorCorrectionEffect in the place at all, so nothing
+	    could grade the image. This is the cheapest depth lever in Roblox and we had none of it.
+	  * `bloomThreshold` - Bloom sat at 2.6 against a sea of 3.2% luminance, so nothing ever bloomed. The
+	    threshold has to sit under the brightest thing on screen or the effect is decorative.
+	  * `sunRays` - SunRaysEffect was Enabled with Intensity 0. Enabled and doing nothing.
+	  * `shiftTop`/`shiftBottom` - `ColorShift_Top` is the colour of the light from above. Warming it is
+	    what makes sunlight look like sunlight; a global tint alone just washes the whole frame.
+]]
+export type GradeSpec = {
+	saturation: number, -- ColorCorrectionEffect.Saturation, -1..1
+	contrast: number, -- ColorCorrectionEffect.Contrast
+	brightness: number, -- ColorCorrectionEffect.Brightness, small trims only
+	tint: Color3, -- ColorCorrectionEffect.TintColor
+	bloomIntensity: number,
+	bloomThreshold: number, -- keep BELOW the brightest thing on screen or bloom does nothing
+	sunRays: number, -- SunRaysEffect.Intensity. Only meaningful when the sky has a sun disc
+	--[[
+		Sky.SunAngularSize, and it lives on the STATE rather than on the sky on purpose.
+
+		A skybox cannot be cross-faded - six ContentIds, no blend - so it snaps at the halfway point. If the
+		sun disc were a property of the sky it would snap with it, and the plan's requirement is that the sun
+		FADES OUT across Choppy. Here it rides `lerp` like everything else, so the disc has already shrunk to
+		nothing by the time the skybox actually changes.
+	]]
+	sunSize: number,
+	--[[
+		🔴 Lighting.ExposureCompensation - the lever that actually rescued the storm.
+
+		`Brightness` is only the SUN, so in a sunless overcast it does almost nothing: Storm went black and
+		survived three rounds of raising brightness, ambient, reflectance and water colour. An isolation test
+		ruled the clouds out too (cover 0.78 -> 0.20 changed the sea not at all).
+
+		This is a stop-for-stop exposure control on the WHOLE frame, and it is what gives a dark scene tonal
+		range instead of crushing it. It was sitting at -0.05 globally, driven by nothing.
+
+		Keep it near 0 for the fair states - they are already correctly exposed - and push it up as the light
+		goes away. The Wall stays low ON PURPOSE: being unable to see is its mechanic.
+	]]
+	exposure: number,
+	shiftTop: Color3, -- Lighting.ColorShift_Top: the colour of the sun
+	shiftBottom: Color3, -- Lighting.ColorShift_Bottom: the colour of the bounce
+}
+
+--[[
+	Terrain.Clouds - DYNAMIC clouds, and they were already in the place at Cover 0.15, i.e. invisible.
+
+	These are not the skybox. The skybox clouds are painted on and never move; these are volumetric, they
+	drift, and they are the biggest sky win available to an ocean game. Driving Cover from the state is what
+	makes the sky thicken as the storm closes.
+]]
+export type CloudSpec = {
+	cover: number, -- 0..1
+	density: number, -- 0..1
+	color: Color3,
+}
+
 export type SeaState = {
 	id: string,
 	name: string,
@@ -96,6 +160,8 @@ export type SeaState = {
 	]]
 	severity: number,
 	atmosphere: AtmosphereSpec,
+	grade: GradeSpec,
+	clouds: CloudSpec,
 	wave: WaveSpec,
 	spray: number, -- 0..1 drives whitecap/spray density in the VFX layer
 	audioBed: string, -- key into the audio registry (group 12)
@@ -111,15 +177,27 @@ export type SeaState = {
 	0.185 -> 0.185 -> 0.309 -> 0.106, so the sea visibly brightened just as it turned nasty. Caught by
 	screenshot, then confirmed by computing the luminances.
 ]]
-local ABYSS_NAVY = Color3.fromRGB(11, 30, 45) -- luminance 0.106
-local DEEP_OCEAN = Color3.fromRGB(18, 53, 74) -- luminance 0.185
-local STORM_TEAL = Color3.fromRGB(30, 90, 110) -- luminance 0.309 - SHALLOW water, not rough water
-local CHOP_BLUE = Color3.fromRGB(15, 42, 58) -- between Deep Ocean and Abyss Navy
+local ABYSS_NAVY = Color3.fromRGB(20, 48, 64) -- lifted in job 028 so waves still read under storm cloud
+-- Kept as palette anchors from visual-design.md though nothing references them now: Deep Ocean was the
+-- old start of the ramp (job 028 replaced it with lit water), and Storm Teal belongs to sheltered water.
+local _DEEP_OCEAN = Color3.fromRGB(18, 53, 74) -- luminance 0.185
+local _STORM_TEAL = Color3.fromRGB(30, 90, 110) -- luminance 0.309 - SHALLOW water, not rough water
+local CHOP_BLUE = Color3.fromRGB(24, 66, 88) -- lifted twice in job 028; 15,42,58 left a cliff in the ramp
 local WALL_BLACK = Color3.fromRGB(8, 20, 30) -- darker than Abyss Navy; the sea at its worst
 local COLD_MIST = Color3.fromRGB(110, 142, 153)
 local THUNDER_CLOUD = Color3.fromRGB(42, 49, 59)
 local WET_STEEL = Color3.fromRGB(75, 89, 100)
 local FOG_GREY = Color3.fromRGB(140, 154, 163)
+
+--[[
+	SUNLIT water, added in job 028. The old ramp started at Deep Ocean (18,53,74) for BOTH calm states -
+	3.2% linear luminance, which is near-black. A sunny day cannot be built on near-black water.
+
+	The ramp still DARKENS monotonically as the sea worsens, which is the rule job 007 established; it just
+	starts much higher now. Luminances: 12.1% -> 9.4% -> 2.6% -> 1.5% -> 1.0%.
+]]
+local SUNLIT_MIRROR = Color3.fromRGB(34, 104, 128) -- Dead Calm: glass under a blazing sun
+local WORKING_BLUE = Color3.fromRGB(26, 88, 116) -- Light Swell: the good day
 
 --[[
 	Dead Calm is deliberately the *most* unsettling state, not the safest-feeling one: glass water and a
@@ -131,7 +209,7 @@ SeaStates.DeadCalm = {
 	name = "Dead Calm",
 	description = "Glass water, no wind, wrong silence. Long sightlines and nowhere to hide.",
 	water = {
-		color = DEEP_OCEAN,
+		color = SUNLIT_MIRROR,
 		reflectance = 0.65, -- high: a mirror sea is the whole point
 		transparency = 0.35,
 		waveSize = 0.02,
@@ -142,17 +220,35 @@ SeaStates.DeadCalm = {
 		fogEnd = 2900, -- the longest view in the game, but still inside OCEAN_HALF_EXTENT
 		fogColor = COLD_MIST,
 		outdoorAmbient = 1.0,
-		brightness = 2.6,
+		brightness = 2.4, -- still the hottest state: the doldrums are SUPPOSED to glare
 	},
 	atmosphere = {
-		density = 0.30, offset = 0.25, haze = 0.6, glare = 0.05,
-		color = Color3.fromRGB(150, 165, 175), -- pale, clean air: you can see for miles, which is the problem
-		decay = Color3.fromRGB(86, 100, 112),
+		--[[
+			🔴 `offset` is the SILHOUETTE control. Roblox's docs: "Lower values blend distant objects
+			seamlessly into the skybox; higher values create horizon silhouettes." It was 0.25 on the
+			CLEAREST day, which is why distant land dissolved instead of reading as a pale shape.
+
+			`glare` matters twice over: it draws the sun's glare AND it is the gate on `decay` - the
+			away-from-sun hue does not render at all while glare is 0. At 0.05 the sky was a single flat
+			wash with no directional falloff.
+		]]
+		density = 0.22, offset = 0.55, haze = 1.2, glare = 0.45,
+		color = Color3.fromRGB(245, 232, 205), -- warm, hazy glare: the doldrums, oppressive by HEAT
+		decay = Color3.fromRGB(150, 178, 200), -- cool blue away from the sun
 	},
 	severity = 0.00, -- time wins entirely
-	skyId = "SunlessBlue", -- cold and clear, no sun disc - the calm that feels wrong
+	skyId = "SunlessBlue", -- clear blue with a big blazing sun: the doldrums
 	wave = { amplitude = 0.15, length = 90, speed = 4, choppiness = 0.0, directionSpread = 0.1, directionDeg = 0 },
 	spray = 0.0,
+	--[[ THE DOLDRUMS. Blazing, hazy, windless. Oppressive by heat and stillness, not by cold - which is
+		what keeps it from rhyming with The Wall at the other end of the ladder. ]]
+	grade = {
+		saturation = 0.12, contrast = 0.06, brightness = 0.02,
+		tint = Color3.fromRGB(255, 246, 230),
+		bloomIntensity = 1.15, bloomThreshold = 1.15, sunRays = 0.22, sunSize = 21, exposure = -0.05,
+		shiftTop = Color3.fromRGB(255, 238, 205), shiftBottom = Color3.fromRGB(150, 170, 190),
+	},
+	clouds = { cover = 0.08, density = 0.26, color = Color3.fromRGB(245, 242, 236) },
 	audioBed = "sea_dead_calm",
 } :: SeaState
 
@@ -162,7 +258,7 @@ SeaStates.LightSwell = {
 	name = "Light Swell",
 	description = "The working default. A gentle roll, a readable horizon, comfortable to steer.",
 	water = {
-		color = DEEP_OCEAN,
+		color = WORKING_BLUE,
 		reflectance = 0.30,
 		transparency = 0.25,
 		waveSize = 0.18,
@@ -173,17 +269,35 @@ SeaStates.LightSwell = {
 		fogEnd = 2800,
 		fogColor = FOG_GREY,
 		outdoorAmbient = 1.0,
-		brightness = 3.0,
+		-- 3.0 clipped the start island's sand to pure white once job 028 added warm ColorShift and
+		-- contrast on top. The grade multiplies what this sets; it does not replace it.
+		brightness = 2.5,
 	},
 	atmosphere = {
-		density = 0.45, offset = 0.30, haze = 1.4, glare = 0.05,
-		color = Color3.fromRGB(132, 145, 154),
-		decay = Color3.fromRGB(58, 68, 80),
+		density = 0.30, offset = 0.50, haze = 1.0, glare = 0.35,
+		color = Color3.fromRGB(232, 226, 210), -- warm pale: a good working day
+		decay = Color3.fromRGB(128, 156, 180),
 	},
 	severity = 0.15, -- barely tints the hour
-	skyId = "SnowGrey", -- flat grey overcast: the working sea
+	--[[
+		Changed in job 028 from SnowGrey. "Warm and sunny" cannot be built on a flat grey overcast, and
+		SkyLibrary's own note warns that a sharp sun disc punched through an overcast reads as broken.
+
+		So the two fair states SHARE the clear blue sky and are told apart by cloud cover (0.08 vs 0.22),
+		grade and sun size - which is also what stops the DeadCalm -> LightSwell transition snapping, since
+		there is no skybox change between them at all.
+	]]
+	skyId = "SunlessBlue", -- legacy id; it is the clear blue sky WITH a sun now
 	wave = { amplitude = 0.8, length = 70, speed = 11, choppiness = 0.2, directionSpread = 0.2, directionDeg = 8 },
 	spray = 0.1,
+	-- THE GOOD DAY. This is the state the player should miss once it is gone.
+	grade = {
+		saturation = 0.07, contrast = 0.04, brightness = 0.0,
+		tint = Color3.fromRGB(252, 248, 238),
+		bloomIntensity = 1.0, bloomThreshold = 1.4, sunRays = 0.16, sunSize = 17, exposure = 0.0,
+		shiftTop = Color3.fromRGB(255, 244, 222), shiftBottom = Color3.fromRGB(140, 162, 184),
+	},
+	clouds = { cover = 0.22, density = 0.32, color = Color3.fromRGB(238, 240, 242) },
 	audioBed = "sea_light_swell",
 } :: SeaState
 
@@ -203,18 +317,27 @@ SeaStates.Choppy = {
 		fogStart = 80,
 		fogEnd = 1900,
 		fogColor = WET_STEEL,
-		outdoorAmbient = 0.85,
-		brightness = 2.4,
+		outdoorAmbient = 0.90,
+		brightness = 2.6, -- raised with Storm's: cover-0.55 cloud eats light the old numbers never accounted for
 	},
 	atmosphere = {
-		density = 0.52, offset = 0.30, haze = 1.4, glare = 0.05,
-		color = Color3.fromRGB(120, 132, 141),
-		decay = Color3.fromRGB(58, 68, 80),
+		density = 0.42, offset = 0.38, haze = 1.4, glare = 0.18,
+		color = Color3.fromRGB(168, 178, 186), -- the warmth is draining out
+		decay = Color3.fromRGB(86, 100, 114),
 	},
 	severity = 0.45, -- weather tints heavily
 	skyId = "FogOnWater", -- weather closing in
 	wave = { amplitude = 2.0, length = 55, speed = 15, choppiness = 0.5, directionSpread = 0.4, directionDeg = 15 },
 	spray = 0.35,
+	-- THE TURN. Warmth draining, sun going hazy behind thickening cloud. The sun disc fades out ACROSS
+	-- this state, so the sky swap lands where cloud already hides it rather than popping.
+	grade = {
+		saturation = -0.10, contrast = 0.05, brightness = -0.01,
+		tint = Color3.fromRGB(240, 244, 248),
+		bloomIntensity = 0.7, bloomThreshold = 1.35, sunRays = 0.06, sunSize = 7, exposure = 0.25,
+		shiftTop = Color3.fromRGB(222, 228, 232), shiftBottom = Color3.fromRGB(96, 112, 126),
+	},
+	clouds = { cover = 0.55, density = 0.44, color = Color3.fromRGB(186, 192, 199) },
 	audioBed = "sea_choppy",
 } :: SeaState
 
@@ -225,7 +348,7 @@ SeaStates.Storm = {
 	description = "Heavy swell, rain, whitecaps. A small launch is in trouble here.",
 	water = {
 		color = ABYSS_NAVY,
-		reflectance = 0.14,
+		reflectance = 0.20, -- picks up enough sky for the surface to read as water rather than as a void
 		transparency = 0.10,
 		waveSize = 0.85,
 		waveSpeed = 22,
@@ -234,11 +357,27 @@ SeaStates.Storm = {
 		fogStart = 40,
 		fogEnd = 900,
 		fogColor = THUNDER_CLOUD,
-		outdoorAmbient = 0.55,
-		brightness = 1.6,
+		--[[
+			🔴 AMBIENT CARRIES AN OVERCAST, NOT BRIGHTNESS - and this is physics, not a workaround.
+
+			`Brightness` is the SUN. Storm has no sun disc, so raising it did almost nothing: the state went
+			black and three rounds of raising brightness, reflectance and water colour barely moved it. An
+			isolation test settled it - dropping cloud cover from 0.78 to 0.20 changed the sea not at all,
+			so the clouds were not eating the light either.
+
+			A real overcast is the opposite of a clear day: light arrives from the WHOLE SKY as diffuse
+			ambient and almost none of it is directional. So ambient goes UP past Dead Calm's 1.0 while
+			brightness comes DOWN. That reads as flat, sunless, heavy - which is exactly the brief.
+
+			Storm must stay DARK AND LEGIBLE. Being unable to see the water is The Wall's job, not Storm's.
+		]]
+		outdoorAmbient = 1.35,
+		brightness = 1.8,
 	},
 	atmosphere = {
-		density = 0.62, offset = 0.20, haze = 2.0, glare = 0.02, -- haze at the 2.0 ceiling, not past it
+		-- haze at the 2.0 ceiling, not past it (job 007: above ~2 flattens all wave detail).
+		-- glare stays just above 0 so `decay` still renders and the sky keeps some falloff.
+		density = 0.62, offset = 0.22, haze = 2.0, glare = 0.06,
 		color = Color3.fromRGB(86, 96, 105),
 		decay = Color3.fromRGB(30, 36, 44),
 	},
@@ -246,6 +385,15 @@ SeaStates.Storm = {
 	skyId = "AngryHeavens", -- dark storm cloud
 	wave = { amplitude = 4.5, length = 45, speed = 20, choppiness = 0.8, directionSpread = 0.6, directionDeg = 22 },
 	spray = 0.75,
+	-- COLD. No sun at all from here on.
+	grade = {
+		-- contrast stays low: +0.10 crushed the blacks into one flat mass with the waves invisible inside it
+		saturation = -0.28, contrast = 0.04, brightness = 0.02,
+		tint = Color3.fromRGB(224, 234, 244),
+		bloomIntensity = 0.35, bloomThreshold = 1.8, sunRays = 0.0, sunSize = 0, exposure = 0.85,
+		shiftTop = Color3.fromRGB(150, 162, 175), shiftBottom = Color3.fromRGB(58, 70, 80),
+	},
+	clouds = { cover = 0.78, density = 0.52, color = Color3.fromRGB(118, 124, 132) },
 	audioBed = "sea_storm",
 } :: SeaState
 
@@ -285,8 +433,9 @@ SeaStates.TheWall = {
 	},
 	atmosphere = {
 		density = 0.85, offset = 0.10, haze = 2.0, glare = 0.0,
-		color = Color3.fromRGB(70, 78, 88),
-		decay = Color3.fromRGB(24, 29, 36),
+		-- cooler than Storm's air, for the same reason as shiftTop: red-minus-blue must not turn back up
+		color = Color3.fromRGB(66, 76, 92),
+		decay = Color3.fromRGB(22, 28, 38),
 	},
 	--[[
 		BlackVoid is a DELIBERATE choice, kept after review (2026-08-20).
@@ -303,6 +452,16 @@ SeaStates.TheWall = {
 	skyId = "BlackVoid",
 	wave = { amplitude = 7.5, length = 38, speed = 26, choppiness = 1.0, directionSpread = 0.9, directionDeg = 30 },
 	spray = 1.0,
+	-- The world has stopped existing. Colour is nearly gone, which is the point.
+	grade = {
+		saturation = -0.55, contrast = 0.14, brightness = -0.06,
+		tint = Color3.fromRGB(216, 228, 240),
+		bloomIntensity = 0.2, bloomThreshold = 2.2, sunRays = 0.0, sunSize = 0, exposure = 0.40,
+		-- cooler than Storm's, or the ladder's cooling REVERSES on the final step. Caught by measuring
+		-- red-minus-blue across all five states, which no eye would spot in a near-black scene.
+		shiftTop = Color3.fromRGB(86, 98, 118), shiftBottom = Color3.fromRGB(30, 38, 50),
+	},
+	clouds = { cover = 1.0, density = 0.72, color = Color3.fromRGB(66, 70, 76) },
 	audioBed = "sea_the_wall",
 } :: SeaState
 
@@ -496,6 +655,29 @@ function SeaStates.lerp(a: SeaState, b: SeaState, t: number): SeaState
 			color = c(a.atmosphere.color, b.atmosphere.color),
 			decay = c(a.atmosphere.decay, b.atmosphere.decay),
 		},
+		--[[
+			The grade blends like everything else. If it snapped, the whole point of job 028 would be lost:
+			the drain from warm to cold IS the storm's arrival, and half the world easing while half of it
+			snaps is exactly the bug the header describes.
+		]]
+		grade = {
+			saturation = n(a.grade.saturation, b.grade.saturation),
+			contrast = n(a.grade.contrast, b.grade.contrast),
+			brightness = n(a.grade.brightness, b.grade.brightness),
+			tint = c(a.grade.tint, b.grade.tint),
+			bloomIntensity = n(a.grade.bloomIntensity, b.grade.bloomIntensity),
+			bloomThreshold = n(a.grade.bloomThreshold, b.grade.bloomThreshold),
+			sunRays = n(a.grade.sunRays, b.grade.sunRays),
+			sunSize = n(a.grade.sunSize, b.grade.sunSize),
+			exposure = n(a.grade.exposure, b.grade.exposure),
+			shiftTop = c(a.grade.shiftTop, b.grade.shiftTop),
+			shiftBottom = c(a.grade.shiftBottom, b.grade.shiftBottom),
+		},
+		clouds = {
+			cover = n(a.clouds.cover, b.clouds.cover),
+			density = n(a.clouds.density, b.clouds.density),
+			color = c(a.clouds.color, b.clouds.color),
+		},
 		wave = {
 			amplitude = n(a.wave.amplitude, b.wave.amplitude),
 			length = n(a.wave.length, b.wave.length),
@@ -516,6 +698,25 @@ end
 	wherever it is called. The storm system will own calling this on the server and replicating the
 	current state; for now it exists so a state can be judged by eye.
 ]]
+--[[
+	Get an effect object, creating it if the place does not have one.
+
+	Returns `any` deliberately: `Instance.new` with a string class name cannot be typed more precisely, and
+	the alternative is a nil-union at every assignment below.
+
+	🔴 This CREATES rather than requiring a human to add the object. The place had no `ColorCorrectionEffect`
+	at all, and an absent effect would silently drop the entire grade with no error anywhere.
+]]
+local function ensureEffect(parent: Instance, className: string): any
+	local found = parent:FindFirstChildOfClass(className)
+	if found then
+		return found
+	end
+	local made = Instance.new(className)
+	made.Parent = parent
+	return made
+end
+
 function SeaStates.apply(state: SeaState)
 	local Terrain = workspace.Terrain
 	Terrain.WaterColor = state.water.color
@@ -525,6 +726,16 @@ function SeaStates.apply(state: SeaState)
 	Terrain.WaterWaveSpeed = state.water.waveSpeed
 
 	local Lighting = game:GetService("Lighting")
+	--[[
+		⚠️ THESE THREE DO NOTHING. Finding 0027: Roblox hides and stops applying FogStart/FogEnd/FogColor
+		whenever Lighting holds an Atmosphere object, and this place has one. Proved by setting FogEnd from
+		2353 to 300 and getting a pixel-identical screenshot.
+
+		They are still written so that DELETING the Atmosphere degrades to the old look rather than to no
+		visibility model at all. Retiring `sky.fogEnd` and repointing everything derived from it - the radar's
+		visibility readout, validateFogWithinOcean, decision 0025's corridor arithmetic - is job 028 step 1
+		and is NOT done yet. Do not reason about visibility from these numbers.
+	]]
 	Lighting.FogStart = state.sky.fogStart
 	Lighting.FogEnd = state.sky.fogEnd
 	Lighting.FogColor = state.sky.fogColor
@@ -557,6 +768,60 @@ function SeaStates.apply(state: SeaState)
 		atm.Glare = at.glare
 		atm.Color = at.color
 		atm.Decay = at.decay
+	end
+
+	--[[
+		THE GRADE - the final image. Job 028.
+
+		Five of these were dead before this job: there was no ColorCorrectionEffect at all, Bloom's threshold
+		sat above anything on screen, SunRays was Enabled at Intensity 0, and ColorShift was cold in every
+		state. Together they are what makes a warm day read as warm and the storm read as the warmth leaving.
+	]]
+	local g = state.grade
+	if g then
+		Lighting.ExposureCompensation = g.exposure
+		-- the colour of the light itself, which is what a global tint alone cannot fake
+		Lighting.ColorShift_Top = g.shiftTop
+		Lighting.ColorShift_Bottom = g.shiftBottom
+
+		local cc = ensureEffect(Lighting, "ColorCorrectionEffect")
+		cc.Name = "SeaGrade"
+		cc.Saturation = g.saturation
+		cc.Contrast = g.contrast
+		cc.Brightness = g.brightness
+		cc.TintColor = g.tint
+
+		local bloom = Lighting:FindFirstChildOfClass("BloomEffect")
+		if bloom then
+			bloom.Intensity = g.bloomIntensity
+			bloom.Threshold = g.bloomThreshold -- must stay UNDER the brightest thing on screen
+		end
+		local rays = Lighting:FindFirstChildOfClass("SunRaysEffect")
+		if rays then
+			rays.Intensity = g.sunRays -- only means anything while the sky still has a sun disc
+		end
+
+		--[[
+			The sun disc. SkyLibrary.apply has already run above and set the sky's own defaults, so this
+			overrides them with the state's blended value.
+
+			`CelestialBodiesShown` is the gate: SunAngularSize alone draws nothing while it is false, which
+			is how the place ended up with no sun anywhere.
+		]]
+		local sky = Lighting:FindFirstChildOfClass("Sky")
+		if sky then
+			sky.SunAngularSize = g.sunSize
+			sky.CelestialBodiesShown = g.sunSize > 0
+		end
+	end
+
+	-- Dynamic clouds. Present in the place at Cover 0.15 - invisible - and driven by nothing until now.
+	local cl = state.clouds
+	if cl then
+		local clouds = ensureEffect(Terrain, "Clouds")
+		clouds.Cover = cl.cover
+		clouds.Density = cl.density
+		clouds.Color = cl.color
 	end
 end
 
