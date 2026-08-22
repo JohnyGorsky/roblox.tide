@@ -33,7 +33,7 @@
 
 | | Feature | Id | Status | Pri |
 |---|---|---|---|---|
-| `#....` | [Curated Island Library](docs/features/0005-island-library/feature.md) | GAME-0005 | PLANNED | P0 |
+| `###..` | [Curated Island Library](docs/features/0005-island-library/feature.md) | GAME-0005 | IN_PROGRESS | P0 |
 
 ### lobby
 
@@ -76,8 +76,8 @@
 
 | Status | Features |
 |---|---|
-| PLANNED | 6 |
-| IN_PROGRESS | 5 |
+| PLANNED | 5 |
+| IN_PROGRESS | 6 |
 | IMPLEMENTED | 3 |
 | **total** | **14** |
 
@@ -105,7 +105,7 @@ Groups are sized to be taken one at a time. See [docs/build/README.md](docs/buil
 
 | Status | Count |
 |---|---|
-| GRAYBOX | 8 |
+| GRAYBOX | 9 |
 | IDEA | 9 |
 | IMPLEMENTED | 6 |
 
@@ -121,6 +121,7 @@ Groups are sized to be taken one at a time. See [docs/build/README.md](docs/buil
 | `GB-TENDER` | ASSET-BOAT-TENDER | game | The fuel-free rescue boat (job 023, decision 0024). Built through the vessel KIT rather than hand-rolled - a second Vessel.Spec at 6 x 2.5 x 12, density 1.2, draft 0.8, four buoyancy points - so it inherits the clamped buoyancy that stopped the launch destroying itself in job 021, and it is the first real test that decision 0009's derivations hold at a twentieth of the launch's mass (216 against 4200). A WoodPlanks box until it earns a model. Runtime-built, so an Edit-mode graybox audit reports it as runtime-only. HARD CONSTRAINT ON ANY REPLACEMENT: cruise must stay under 8.75 studs/s, which is StormFront.ADVANCE_RATE / GAIN_PER_STUD. A fuel-free boat faster than that gains ground on the storm forever and makes the launch, and the whole fuel economy it exists to consume, pointless. Measured at 4.82 studs/s settled with the front still closing at -13.80. |
 | `GB-FUEL-BARREL` | ASSET-FUEL-BARREL | game | Drifting diesel barrels, 4 of them at 200-400 studs, 35 fuel each against the launch's 100 capacity (job 023). A CorrodedMetal cylinder until group 03's real barrel exists - that group already plans both a jerry can and a barrel, so this is a placeholder with a known replacement. ANCHORED and positioned onto the wave surface each frame rather than floated: terrain water buoys unanchored parts toward a FLAT Y=0 plane (finding 0008), which would fight the wave field and read as jitter. Nothing about a barrel needs simulating - it needs to look like it is bobbing and to be reachable. The 200-400 band is decision 0024's cost table: a round trip at the tender's 6 studs/s costs 22-44% of the storm's 4200-stud cushion. Keep that band when replacing them; the distance IS the mechanic. |
 | `GB-RADAR-STATION` | ASSET-RADAR-MK1 | game | The radar station, built at run time by RadarServer (job 026). Four boxes: a 4 x 2.8 x 0.3 screen on a 2.4 x 2.2 x 1.6 pedestal at the radarConsole socket, and a 4.5-stud aerial bar on a mast at the radar socket. Runtime-built, so an Edit-mode graybox audit reports it as runtime-only. WHAT MUST SURVIVE A REPLACEMENT, because these are decisions rather than styling: (1) The screen is VERTICAL and its facing is set by rotating the part so its own LookVector points aft - a text-bearing SurfaceGui on a Top face comes out sideways, because a top face maps its up-axis to one of the part's horizontal axes. The compass gets away with a top face only because a compass card is rotationally symmetric. (2) The face carrying the scope must be able to hold a SQUARE dial, or the circle becomes an ellipse and every bearing drawn on it is a lie. (3) Self-lit, LightInfluence 0 - the legend and the failure message must be readable at The Wall's brightness of 0.30 even though the radar is dead there. (4) The console stays AWAY from the helm. The distance is the mechanic: watching the radar has to be a job somebody takes rather than something the driver does with a glance. (5) The aerial is ANCHORED and repositioned each frame, not welded and spun. Spinning a part welded into a moving physics assembly fights the solver, which is how job 021 lost a hull. Positions are provisional - the user places all instruments once the real hull exists. |
+| `GB-ISLAND-PROPS` | ASSET-ISLAND-PROPS | game | Graybox props at the manifest's three DRY zones on every pasted island, built at run time by IslandServer (job 027) - so an Edit-mode audit reports them as runtime-only, and there are 12 of them with four islands placed. Slate boxes and cylinders, no detail: a wreck reads as a wreck because it is a tilted slab. GB_Wreck  - an 18 x 7 x 6 hull fragment tipped over, a rib, a flat tarp. GB_Camp   - a 9 x 6 x 7 tent, a firepit disc, a drying rack. GB_Rise   - a 26-wide x 6-thick mound disc, a dead tree, a boulder. WHAT MUST SURVIVE A REPLACEMENT: (1) The RISE IS A PROP, NOT TERRAIN. The plateau is deliberately flat to one voxel so that markers and party-pad-style placements can rely on it; sculpting a hill into it would give that up for scenery that a mesh does better. (2) Props are seated by RAYCAST against the terrain that actually pasted, never at a stored height. If the ground is not there the island is skipped instead of props floating over open water. (3) A cylinder's axis is its LOCAL X, so a low disc is Size (thickness, diameter, diameter) rotated 90 degrees about Z. Size (26, 6, 26) builds a 26-stud tower, which is what the first version did. The real props become an asset table once the zone shapes are settled - see the job 027 summary. |
 
 Verify against the live places with `tools/audit-graybox.luau` - it catches placeholders
 that exist in Studio but were never registered.
@@ -153,6 +154,7 @@ that exist in Studio but were never registered.
 - [x] **024** Sculpt and paint two islands: the lobby hub and the game start island
 - [x] **025** The lobby's atmosphere: a harbour sky, a calm sea, and a storm that never arrives
 - [x] **026** Radar Mk1: a station you stand at, a storm from astern, and circles where something might be
+- [x] **027** Islands, first slice: prove the template pipeline with one
 
 An unchecked job is still in flight.
 

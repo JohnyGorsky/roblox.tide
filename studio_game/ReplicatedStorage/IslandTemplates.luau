@@ -13,21 +13,49 @@
 	runtime spawner read the same description.
 
 	--------------------------------------------------------------------------------------------------
-	THE PROFILE, AND THE ONE RULE IT EXISTS TO OBEY
+	THE PROFILE
 
 	    r <= rp          flat plateau
-	    rp < r <= rb     upper beach, gentle
-	    rb < r <= rf     THE STEEP FACE, crossing the waterline in roughly one voxel
-	    rf < r <= ro     underwater shelf
+	    rp < r <= rb     upper beach, gentle, bottoming out at `beachTop`
+	    r > rb           THE DROP - a cliff everywhere except the landing arc
+	    ... <= ro        underwater shelf, down to `shelfBottom`
 	    r > ro           untouched
-
-	🔴 The steep face is not a style choice. Land whose surface sits between the water level and about
-	WATER_Y + 8 renders as thin hole-riddled sheets - the shelf artifact - and a gentle beach ramp through the
-	waterline produces it along its entire length. Job 024 measured the floor: 240 offending columns around a
-	400-column shoreline ring, which is what "as good as it gets" looks like.
 
 	Noise is applied to the band RADII, never to the heights. The outline then wanders while the plateau stays
 	provably flat - which matters because things get placed on it.
+
+	--------------------------------------------------------------------------------------------------
+	🔴 THE SHELF ARTIFACT, AND HOW THIS PROFILE AVOIDS IT BY CONSTRUCTION
+
+	Land whose surface sits between the water level and about WATER_Y + 8 renders as thin hole-riddled
+	sheets. Job 024 measured the floor for a gentle shore: 240 offending columns around a 400-column
+	shoreline. Job 027's first sculpt measured 335, clearly visible as flat sheets lying on the sea.
+
+	A gentle ramp CANNOT avoid it: to get from +10 to -4 continuously you must pass through the band, and
+	whatever column lands in there is a sheet. Making the ramp steeper only reduces the count.
+
+	So the drop is a DISCONTINUITY instead. Outside the landing arc, `heightAt` jumps straight from
+	`beachTop` to `faceBottom` with nothing in between, so no column's surface can land in the forbidden
+	band - not "rarely", but never. The renderer bridges the two adjacent columns with a ~74 degree face,
+	which is still walkable (a Humanoid's default `MaxSlopeAngle` is 89).
+
+	⚠️ The cost is that the coastline is a low bluff rather than a beach, so ONE landing arc keeps a real
+	sandy shore - see `Landing`. That arc is the only place the artifact is accepted, it is small, and it is
+	exactly where the dock and jetty art will sit.
+
+	--------------------------------------------------------------------------------------------------
+	🔴 SMOOTH TERRAIN'S SURFACE SITS RES/2 ABOVE THE HEIGHT YOU ASK FOR
+
+	Measured in job 027 across 73 columns: the collision surface of a column is
+
+	    topmost non-empty voxel centre + occupancy * 4        (mean absolute error 0.087 studs)
+
+	which for a sculpt target `h` simplifies to **`h + 2`**. The `roblox-terrain` skill's rule of
+	"centre + RES/2" is off by up to 2 studs (mean error 1.657 studs on the same data).
+
+	So a plateau declared at 16 is WALKED ON AT 18, and every height in this file is a sculpt target rather
+	than a stand-on height. `IslandTemplates.surfaceOf` converts. Anything comparing a raycast against a band
+	height must convert first, or it is silently wrong by 2.
 
 	--------------------------------------------------------------------------------------------------
 	VOXEL ALIGNMENT: THE PLATEAU HEIGHT MUST BE A MULTIPLE OF 4
@@ -61,15 +89,29 @@
 
 local IslandTemplates = {}
 
+local RES = 4 -- the terrain voxel size, which the surface rule above depends on
+
 export type Band = {
 	plateau: number,
 	rp: number, -- plateau radius
-	rb: number, -- upper beach outer radius
-	rf: number, -- foot of the steep face
+	rb: number, -- upper beach outer radius; the drop starts here
 	ro: number, -- outer edge of the underwater shelf
-	beachTop: number, -- height at rb
-	faceBottom: number, -- height at rf
+	beachTop: number, -- the LOWEST DRY height. Must stay clear of the forbidden band
+	faceBottom: number, -- the height the drop lands at, below the forbidden band
 	shelfBottom: number, -- height at ro
+}
+
+--[[
+	The one arc with a real beach: a walkable ramp through the waterline, so a crew that ends up in the water
+	can get ashore, and so the island has somewhere that looks like a landing.
+
+	`run` is how many studs the drop is spread over at the centre of the arc, tapering to a cliff at its
+	edges. Keep `rb + run` comfortably inside `ro`, or the beach would run out past the shelf.
+]]
+export type Landing = {
+	bearing: number, -- degrees, 0 = +Z. Matched to the Dock marker
+	halfWidth: number, -- degrees either side
+	run: number, -- studs of horizontal run at the centre of the arc
 }
 
 export type MarkerKind = "dock" | "loot" | "spawn" | "poi" | "prop"
@@ -95,6 +137,7 @@ export type Template = {
 	id: string,
 	name: string,
 	band: Band,
+	landing: Landing?,
 	noise: { { amplitude: number, harmonic: number, phase: number } },
 	grassLine: number, -- height above which the paint turns green
 	markers: { Marker },
@@ -113,12 +156,26 @@ local CAY: Template = {
 		plateau = 16, -- a MULTIPLE OF 4, deliberately - see 'voxel alignment' above
 		rp = 90,
 		rb = 130,
-		rf = 138, -- 8 studs of run for 14 studs of drop: a ~60 degree sand slope. Steep, and still walkable
 		ro = 175,
-		beachTop = 8, -- the top of the forbidden band; the face starts here and dives
+		--[[
+			🔴 THE GAP BETWEEN THESE TWO IS THE POINT.
+
+			`beachTop` is the lowest dry land, `faceBottom` the highest wet land, and NOTHING is generated
+			between them. Their surfaces land at +10 and -4 once the RES/2 rule is applied, straddling the
+			0..+8 forbidden band without ever entering it.
+
+			Narrow this gap and the artifact comes back.
+		]]
+		beachTop = 8,
 		faceBottom = -6,
 		shelfBottom = -22,
 	},
+	--[[
+		The landing faces the same way as the Dock marker (bearing 200) - a beach and a mooring in different
+		places would be silly. 26 degrees either side is ~118 studs of shoreline: a beach you can see across,
+		rather than a notch.
+	]]
+	landing = { bearing = 200, halfWidth = 26, run = 16 },
 	--[[
 		Three harmonics on the radii. Deterministic, so the same template sculpts identically every time -
 		which matters because the markers below are placed against the shape it produces.
@@ -139,7 +196,7 @@ local CAY: Template = {
 		{ name = "POI", kind = "poi", radiusFraction = 0, bearing = 0, ground = true, lift = 6,
 			note = "radar contact anchor" },
 
-		-- BEACH: where a boat comes in. Just inside the waterline on the lee side.
+		-- BEACH: where a boat comes in. On the landing arc, which is what makes it reachable on foot.
 		{ name = "Dock", kind = "dock", radiusFraction = 0.79, bearing = 200, ground = false,
 			note = "moor here; sits at the waterline, not on land" },
 
@@ -187,6 +244,14 @@ function IslandTemplates.get(id: string): Template?
 	return (IslandTemplates.Templates :: any)[id]
 end
 
+--[[
+	The height a character actually stands at, given a sculpt target. See the header - this is a MEASURED
+	relationship, not a guess, and forgetting it is a silent 2-stud error in every comparison.
+]]
+function IslandTemplates.surfaceOf(targetHeight: number): number
+	return targetHeight + RES / 2
+end
+
 --- The radius multiplier at a bearing. Applied to every band equally, so their order can never invert.
 function IslandTemplates.radiusNoise(template: Template, theta: number): number
 	local n = 1
@@ -200,23 +265,53 @@ local function smoothstep(u: number): number
 	return u * u * (3 - 2 * u)
 end
 
+--- Compass bearing of a local offset, 0 = +Z, matching `Marker.bearing`.
+local function bearingOf(x: number, z: number): number
+	return math.deg(math.atan2(x, z)) % 360
+end
+
+--- Shortest angle between two bearings, 0..180.
+local function angleBetween(a: number, b: number): number
+	return math.abs((a - b + 180) % 360 - 180)
+end
+
 --[[
-	Surface height at a local XZ offset from the island's centre, or nil for "do not touch this column".
+	How many studs the drop is spread over at this bearing. 0 means a cliff, which is the default and the
+	whole reason the shelf artifact does not appear - see the header.
+]]
+function IslandTemplates.faceRun(template: Template, x: number, z: number): number
+	local l = template.landing
+	if not l or l.halfWidth <= 0 then
+		return 0
+	end
+	local d = angleBetween(bearingOf(x, z), l.bearing)
+	if d >= l.halfWidth then
+		return 0
+	end
+	return l.run * smoothstep(1 - d / l.halfWidth)
+end
+
+--[[
+	Sculpt target height at a local XZ offset from the island's centre, or nil for "do not touch this column".
 
 	Local coordinates on purpose: the same function serves the authoring sculpt and any later analysis without
 	either needing to know where in the world the island ended up.
+
+	⚠️ Returns a SCULPT TARGET. Characters stand at `surfaceOf(that)`.
 ]]
 function IslandTemplates.heightAt(template: Template, x: number, z: number): number?
 	local b = template.band
 	local r = math.sqrt(x * x + z * z)
 	local n = IslandTemplates.radiusNoise(template, math.atan2(z, x))
-	local rp, rb, rf, ro = b.rp * n, b.rb * n, b.rf * n, b.ro * n
+	local rp, rb, ro = b.rp * n, b.rb * n, b.ro * n
+	local rf = rb + IslandTemplates.faceRun(template, x, z) * n -- == rb off the landing arc, i.e. a cliff
+
 	if r <= rp then
 		return b.plateau
 	elseif r <= rb then
 		return b.plateau + smoothstep((r - rp) / (rb - rp)) * (b.beachTop - b.plateau)
 	elseif r <= rf then
-		-- LINEAR here, not smoothed: the point is to cross the waterline fast
+		-- the landing beach: the ONE place a surface is allowed through the forbidden band
 		return b.beachTop + ((r - rb) / (rf - rb)) * (b.faceBottom - b.beachTop)
 	elseif r <= ro then
 		return b.faceBottom + smoothstep((r - rf) / (ro - rf)) * (b.shelfBottom - b.faceBottom)
@@ -231,9 +326,22 @@ function IslandTemplates.markerOffset(template: Template, marker: Marker): Vecto
 	return Vector2.new(math.sin(rad) * r, math.cos(rad) * r)
 end
 
---- How wide a region the island needs, including margin. Used for both the capture and the paste.
+--[[
+	How wide a region the island needs, including margin. Used for both the CAPTURE and the PASTE, which is
+	why it has to be an over-estimate rather than a nice round number.
+
+	🔴 It must account for the radius NOISE. This returned `ro + 20` = 195 at first, while the noise can swell
+	the outline to `ro * 1.15` = 201 - so the outermost ring of the shelf fell outside the box on the four axis
+	directions and would have been clipped out of the captured template, leaving a one-cell step underwater.
+
+	Summing the amplitudes gives the worst case the harmonics can reach together.
+]]
 function IslandTemplates.footprint(template: Template): number
-	return template.band.ro + 20
+	local swell = 1
+	for _, term in ipairs(template.noise) do
+		swell += math.abs(term.amplitude)
+	end
+	return template.band.ro * swell + 8
 end
 
 return IslandTemplates

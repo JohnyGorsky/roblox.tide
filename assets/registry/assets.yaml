@@ -344,3 +344,28 @@ assets:
     (5) The aerial is ANCHORED and repositioned each frame, not welded and spun. Spinning a part welded into a
     moving physics assembly fights the solver, which is how job 021 lost a hull.
     Positions are provisional - the user places all instruments once the real hull exists.
+- id: GB-ISLAND-PROPS
+  type: graybox
+  status: GRAYBOX
+  source: studio
+  represents: ASSET-ISLAND-PROPS
+  place: game
+  roblox_path: Workspace.<island>.Props.GB_Wreck + .GB_Camp + .GB_Rise (runtime-built, 3 per island)
+  feature: GAME-0005
+  notes: >-
+    Graybox props at the manifest's three DRY zones on every pasted island, built at run time by
+    IslandServer (job 027) - so an Edit-mode audit reports them as runtime-only, and there are 12 of them
+    with four islands placed. Slate boxes and cylinders, no detail: a wreck reads as a wreck because it is a
+    tilted slab.
+    GB_Wreck  - an 18 x 7 x 6 hull fragment tipped over, a rib, a flat tarp.
+    GB_Camp   - a 9 x 6 x 7 tent, a firepit disc, a drying rack.
+    GB_Rise   - a 26-wide x 6-thick mound disc, a dead tree, a boulder.
+    WHAT MUST SURVIVE A REPLACEMENT:
+    (1) The RISE IS A PROP, NOT TERRAIN. The plateau is deliberately flat to one voxel so that markers and
+    party-pad-style placements can rely on it; sculpting a hill into it would give that up for scenery that a
+    mesh does better.
+    (2) Props are seated by RAYCAST against the terrain that actually pasted, never at a stored height. If
+    the ground is not there the island is skipped instead of props floating over open water.
+    (3) A cylinder's axis is its LOCAL X, so a low disc is Size (thickness, diameter, diameter) rotated 90
+    degrees about Z. Size (26, 6, 26) builds a 26-stud tower, which is what the first version did.
+    The real props become an asset table once the zone shapes are settled - see the job 027 summary.

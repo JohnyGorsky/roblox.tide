@@ -921,6 +921,110 @@ tools.radarTrySound = {
 	end,
 }
 
+--[[
+	ISLANDS.
+
+	The islands are pasted at boot from a `TerrainRegion` template in `ServerStorage`, so two things go wrong
+	and both are silent from the deck - you simply sail and find nothing:
+
+	  * the template is missing, because the place was never saved after authoring
+	  * an island pasted but failed its ground check and was deliberately skipped
+
+	The first tool says which. The second exists because sailing 500-2,200 studs to look at a paste is not a
+	test loop.
+]]
+local function islands()
+	return (_G :: any).TideIslands
+end
+
+tools.islandsList = {
+	id = "islandsList",
+	label = "List islands",
+	section = "Islands",
+	scope = "local",
+	controls = { kind = "button", output = "text" },
+	run = function(_player: Player, _args: any)
+		local I = islands()
+		if not I then
+			return false, "no island server - is the game in Play?"
+		end
+		local rows = {}
+		local placed = 0
+		for _, spec in ipairs(I.placements) do
+			local live = I.state.islands[spec.name]
+			if live then
+				placed += 1
+				table.insert(rows, ("%-11s (%5d, %5d)  %d off the centreline")
+					:format(spec.name, spec.x, spec.z, math.abs(spec.x)))
+				table.insert(rows, "    " .. live.detail)
+				table.insert(rows, ("    %d markers seated%s"):format(live.seated,
+					live.groundless > 0 and (", " .. live.groundless .. " WITH NO GROUND") or ""))
+			else
+				table.insert(rows, ("%-11s (%5d, %5d)  NOT PLACED"):format(spec.name, spec.x, spec.z))
+			end
+			table.insert(rows, "")
+		end
+		local store = game:GetService("ServerStorage"):FindFirstChild("Islands")
+		local header = store
+				and ("template store: %d template(s) in ServerStorage/Islands"):format(#store:GetChildren())
+			or "🔴 template store MISSING - run tools/author-island.luau in EDIT and SAVE THE PLACE"
+		table.insert(rows, 1, "")
+		table.insert(rows, 1, ("%d of %d placed, %d skipped"):format(placed, #I.placements, I.state.skipped))
+		table.insert(rows, 1, header)
+		return true, table.concat(rows, "\n")
+	end,
+}
+
+tools.islandsAshore = {
+	id = "islandsAshore",
+	label = "Put me ashore",
+	section = "Islands",
+	scope = "local",
+	controls = {
+		kind = "choice",
+		options = { "Gull Rock", "The Spit", "Anvil Cay", "Long Shoal" },
+	},
+	run = function(player: Player, args: any)
+		local I = islands()
+		if not I then
+			return false, "no island server - is the game in Play?"
+		end
+		local name = tostring(args and args.value)
+		local live = I.state.islands[name]
+		if not live then
+			return false, ("%s was not placed - see List islands"):format(name)
+		end
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if not root then
+			return false, "no character - use Spawn me a character first"
+		end
+
+		--[[
+			Dropped on the LANDING BEACH rather than the plateau centre, because the beach is the thing worth
+			looking at: it is the one arc where the shore crosses the waterline, and the rest of the coast is
+			a cliff by design.
+
+			The height comes from a FRESH PROBE, not from the marker's stored Y. If the terrain is not
+			actually there this must fail visibly rather than drop someone into the sea.
+		]]
+		local markers = live.folder:FindFirstChild("Markers")
+		local dock = markers and markers:FindFirstChild("Dock") :: BasePart?
+		local target = dock and dock.Position or live.centre
+		local inland = live.centre - target
+		inland = inland.Magnitude > 1 and inland.Unit or Vector3.new(0, 0, 1)
+		local spot = target + inland * 34 -- step inland so the landing is underfoot, not underwater
+		local ground: number? = I.groundAt(spot.X, spot.Z)
+		if not ground then
+			return false, ("no ground at (%.0f, %.0f) - the paste may have failed"):format(spot.X, spot.Z)
+		end
+		root.CFrame = CFrame.new(Vector3.new(spot.X, ground + 4, spot.Z))
+		return true, ("ashore on %s at (%.0f, %.0f), ground %.1f. You are on the LANDING BEACH - the one arc"
+			.. " where the shore is walkable. Everywhere else the coast is a ~72 degree cliff, which is what"
+			.. " keeps the shelf artifact off the waterline."):format(name, spot.X, spot.Z, ground)
+	end,
+}
+
 tools.expeditionReport = {
 	id = "expeditionReport",
 	label = "Run status",
@@ -1788,7 +1892,7 @@ function AdminTools.manifest(): { any }
 		A section not listed here falls to the end alphabetically, so adding one never breaks the sort - it
 		just does not get a considered position until someone gives it one.
 	]]
-	local SECTION_ORDER = { Expedition = 1, Radar = 2, Vessel = 3, Storm = 4, Weather = 5, Sea = 6, Audio = 7, Diagnostics = 8 }
+	local SECTION_ORDER = { Expedition = 1, Radar = 2, Islands = 3, Vessel = 4, Storm = 5, Weather = 6, Sea = 7, Audio = 8, Diagnostics = 9 }
 	table.sort(list, function(a, b)
 		if a.section == b.section then
 			return a.label < b.label

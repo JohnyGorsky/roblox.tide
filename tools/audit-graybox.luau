@@ -76,6 +76,16 @@ local REGISTERED: { [string]: { represents: string, place: string, path: string,
 		path = "Workspace.StarterLaunch (whole model, hull + all fittings)",
 		runtime = true, -- built by VesselServer.buildVessel, so absent in Edit
 	},
+	--[[
+		Three prop models per pasted island. Runtime because the ISLANDS are runtime too - they are pasted
+		from a TerrainRegion template at boot, so in Edit there is neither island nor props to find.
+	]]
+	["GB-ISLAND-PROPS"] = {
+		represents = "ASSET-ISLAND-PROPS",
+		place = "game",
+		path = "Workspace.<island>.Props.GB_Wreck / GB_Camp / GB_Rise",
+		runtime = true, -- built by IslandServer, one set per island
+	},
 }
 
 local TAG = "Graybox"
